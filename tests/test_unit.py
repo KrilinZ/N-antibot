@@ -336,3 +336,20 @@ def test_every_example_case_is_a_valid_configuration():
     assert load(cases[0].parent / "wordpress.toml").format == "apache"
     assert load(cases[0].parent / "no-ai.toml").blocks_agent("PerplexityBot/1.0") == "PerplexityBot"
     assert load(cases[0].parent / "public-api.toml").blocks_agent("python-requests/2.32") is None
+
+
+def test_every_output_is_plain_ascii():
+    """No encoding surprises on any console or config parser (Windows consoles are not UTF-8 by default)."""
+    for fmt in ("caddy", "nginx", "apache", "nftables", "cloudflare", "json"):
+        assert gen(output={"format": fmt}).isascii(), fmt
+
+
+def test_cli_messages_are_plain_ascii(tmp_path, monkeypatch, capsys):
+    import n_antibot.cli as cli
+
+    monkeypatch.setattr(cli, "blocklist", _bl)
+    assert main(["generate", "-o", str(tmp_path / "x.caddy")]) == 0
+    assert main(["presets"]) == 0
+    assert main(["check", "-o", str(tmp_path / "x.caddy")]) == 0
+    out = capsys.readouterr()
+    assert (out.out + out.err).isascii()

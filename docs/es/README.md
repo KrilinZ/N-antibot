@@ -2,6 +2,8 @@
 
 [← Volver al README](../../README.md) · [🇬🇧 English](../en/README.md)
 
+> Versiones probadas de cada pieza: [tabla de compatibilidad](../../README.md#-compatibilidad).
+
 ## Por tecnología
 
 Elige la guía de lo que tienes **delante de tu web** (lo primero que recibe la petición del visitante).

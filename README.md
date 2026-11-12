@@ -8,8 +8,8 @@
 
 [![CI](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml/badge.svg)](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml)
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-2563eb.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-7c3aed.svg)](pyproject.toml)
-[![Dependencias: 0](https://img.shields.io/badge/dependencias-0-22c55e.svg)](pyproject.toml)
+[![Python 3.9 a 3.14](https://img.shields.io/badge/python-3.9%20%E2%80%93%203.14-7c3aed.svg)](#-compatibilidad)
+[![Dependencias: 0](https://img.shields.io/badge/dependencias-0%20en%20Python%203.11%2B-22c55e.svg)](pyproject.toml)
 [![Caddy](https://img.shields.io/badge/Caddy-2.x-1f88c0.svg)](#-instalación-en-caddy)
 [![nginx](https://img.shields.io/badge/nginx-1.x-009639.svg)](#-instalación-en-nginx)
 [![Apache](https://img.shields.io/badge/Apache-2.4-d22128.svg)](docs/es/apache.md)
@@ -36,7 +36,7 @@ Google, Bing, los robots de IA, tus clientes y `curl` siguen entrando con normal
 ```console
 $ pip install git+https://github.com/KrilinZ/N-antibot.git
 $ n-antibot generate -o n-antibot.caddy
-n-antibot: 241 IPv4 + 17 IPv6 ranges, 18 robots → n-antibot.caddy
+n-antibot: 241 IPv4 + 17 IPv6 ranges, 18 robots -> n-antibot.caddy
 $ sudo ./install/caddy.sh --site example.com --snippet n-antibot.caddy --check-url https://example.com
 n-antibot: ok   Chrome    -> 200
 n-antibot: ok   Googlebot -> 200
@@ -52,6 +52,7 @@ n-antibot: installed: example.com is protected
 - [Cómo funciona](#️-cómo-funciona)
 - [Guías por tecnología y por caso](#-guías-por-tecnología-y-por-caso)
 - [Requisitos](#-requisitos)
+- [Compatibilidad](#-compatibilidad)
 - [Instalación](#-instalación)
   - [Instalación en Caddy](#-instalación-en-caddy)
   - [Instalación en nginx](#-instalación-en-nginx)
@@ -81,7 +82,7 @@ N-antibot nació en una tienda online real para cortar justo eso, con tres princ
 
 | Principio | Qué significa |
 |---|---|
-| **Nada que contratar** | Sin cuentas, sin claves de API, sin JavaScript en tu web y sin dependencias de Python. |
+| **Nada que contratar** | Sin cuentas, sin claves de API, sin JavaScript en tu web y sin dependencias de Python (en 3.9 y 3.10 se instala sola `tomli`, para leer la configuración). |
 | **No romper la web** | Buscadores, robots de IA, navegadores reales, `curl` y tus webhooks nunca se tocan. La configuración se rechaza si una regla tuya pudiera cortar a un navegador o a Google. |
 | **Todo o nada** | Si falla la descarga de rangos no se escribe ningún archivo. El instalador hace copia, valida, recarga, comprueba en vivo y vuelve atrás solo si algo no cuadra. |
 
@@ -179,15 +180,44 @@ La documentación completa está en [`docs/es/`](docs/es/README.md). Cada guía 
 
 | Qué | Versión | Para qué |
 |---|---|---|
-| Python | 3.11 o superior | Ejecutar `n-antibot` (solo biblioteca estándar) |
+| Python | 3.9 o superior | Ejecutar `n-antibot` (solo biblioteca estándar; en 3.9 y 3.10, además `tomli`) |
 | Caddy | 2.x | Si usas la salida `caddy` |
 | nginx | 1.x con `geo` y `map` (vienen de serie) | Si usas la salida `nginx` |
 | Apache | 2.4 con `mod_rewrite` | Si usas la salida `apache` |
 | nftables | Linux, como root | Si usas la salida `nftables` |
-| Node.js | probado con 24 y 26 | Si usas el middleware de `integrations/node/` |
+| Node.js | 18 o superior | Si usas el middleware de `integrations/node/` |
 | Salida a Internet | hacia `stat.ripe.net` | Solo al generar las listas, no al servir la web |
 
 No hace falta instalar nada en la máquina del servidor si generas el archivo en otra y lo copias.
+
+## 🧬 Compatibilidad
+
+Estas son las versiones con las que se ejecutan las pruebas en cada cambio
+([integración continua](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml)). Lo que no aparece aquí no
+está probado, aunque pueda funcionar.
+
+| Pieza | Versiones probadas | Cómo |
+|---|---|---|
+| **Python** | 3.9, 3.10, 3.11, 3.12, 3.13 y 3.14 | Todas las pruebas, en cada versión |
+| **Sistemas** | Ubuntu 22.04, 24.04 y 26.04, macOS | Las pruebas de los servidores disponibles en cada sistema |
+| **Windows** | Windows Server (GitHub) | Solo el generador y la línea de comandos: no hay servidores que probar |
+| **Caddy** | 2.6.2 (Ubuntu 24.04 y 26.04) y 2.11 (macOS) | De punta a punta |
+| **nginx** | 1.18 (Ubuntu 22.04), 1.24 (Ubuntu 24.04) y 1.31 (macOS) | De punta a punta |
+| **Apache** | 2.4.52, 2.4.58, 2.4.66 y 2.4.67 | De punta a punta, en `<VirtualHost>` y en `.htaccess` |
+| **nftables** | 1.0.2 (Ubuntu 22.04) y 1.0.9 (Ubuntu 24.04) | De punta a punta: carga las reglas y comprueba el corte |
+| **Node.js** | 18, 20, 22 y 24 | El middleware, con un servidor HTTP real |
+| **Cloudflare** | | Sin probar en una cuenta: expresión contrastada con su documentación |
+| **Vercel** | | Sin probar en un despliegue: solo la lógica del middleware |
+
+| Compatible con… | Detalle |
+|---|---|
+| **IPv4 e IPv6** | En todas las salidas. El middleware de Node entiende además las IPv4 escritas dentro de IPv6 (`::ffff:1.2.3.4`). |
+| **HTTP/1.1, HTTP/2 y HTTP/3** | El corte se hace por IP, `User-Agent` y ruta, que existen en los tres. El cortafuegos cubre TCP y UDP. |
+| **Proxies y CDN** | Con la IP real configurada: `client_ip` en Caddy, `realip` en nginx, `mod_remoteip` en Apache. |
+| **Docker** | El archivo se monta en el contenedor; el cortafuegos cubre también los puertos publicados por Docker. |
+| **Tus reglas actuales** | Caddy: un `import`. nginx: variables con prefijo propio. Apache: reglas `Rewrite` que conviven con las tuyas. nftables: tabla aparte. Nada sobrescribe lo que ya tienes. |
+| **Alojamiento compartido** | Por `.htaccess`, si el alojamiento usa Apache 2.4 con `mod_rewrite`. |
+| **Salida en texto plano** | Los archivos generados y los mensajes son ASCII: no dan problemas de codificación en ninguna consola. |
 
 ## 🚀 Instalación
 
@@ -201,7 +231,7 @@ O aislado, con [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.2.0`.
+Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.3.0`.
 
 ### 🟦 Instalación en Caddy
 
@@ -343,7 +373,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.2.0",
+  "generator": "n-antibot 0.3.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],

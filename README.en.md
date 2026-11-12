@@ -8,8 +8,8 @@
 
 [![CI](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml/badge.svg)](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-7c3aed.svg)](pyproject.toml)
-[![Dependencies: 0](https://img.shields.io/badge/dependencies-0-22c55e.svg)](pyproject.toml)
+[![Python 3.9 to 3.14](https://img.shields.io/badge/python-3.9%20%E2%80%93%203.14-7c3aed.svg)](#-compatibility)
+[![Dependencies: 0](https://img.shields.io/badge/dependencies-0%20on%20Python%203.11%2B-22c55e.svg)](pyproject.toml)
 [![Caddy](https://img.shields.io/badge/Caddy-2.x-1f88c0.svg)](#-caddy-setup)
 [![nginx](https://img.shields.io/badge/nginx-1.x-009639.svg)](#-nginx-setup)
 [![Apache](https://img.shields.io/badge/Apache-2.4-d22128.svg)](docs/en/apache.md)
@@ -36,7 +36,7 @@ Google, Bing, AI crawlers, your customers and `curl` keep getting in as usual.
 ```console
 $ pip install git+https://github.com/KrilinZ/N-antibot.git
 $ n-antibot generate -o n-antibot.caddy
-n-antibot: 241 IPv4 + 17 IPv6 ranges, 18 robots → n-antibot.caddy
+n-antibot: 241 IPv4 + 17 IPv6 ranges, 18 robots -> n-antibot.caddy
 $ sudo ./install/caddy.sh --site example.com --snippet n-antibot.caddy --check-url https://example.com
 n-antibot: ok   Chrome    -> 200
 n-antibot: ok   Googlebot -> 200
@@ -52,6 +52,7 @@ n-antibot: installed: example.com is protected
 - [How it works](#️-how-it-works)
 - [Guides by technology and by use case](#-guides-by-technology-and-by-use-case)
 - [Requirements](#-requirements)
+- [Compatibility](#-compatibility)
 - [Installation](#-installation)
   - [Caddy setup](#-caddy-setup)
   - [nginx setup](#-nginx-setup)
@@ -81,7 +82,7 @@ N-antibot was born on a real online shop to cut exactly that, with three princip
 
 | Principle | What it means |
 |---|---|
-| **Nothing to sign up for** | No accounts, no API keys, no JavaScript on your site and no Python dependencies. |
+| **Nothing to sign up for** | No accounts, no API keys, no JavaScript on your site and no Python dependencies (on 3.9 and 3.10, `tomli` is installed automatically to read the configuration). |
 | **Do not break the site** | Search engines, AI crawlers, real browsers, `curl` and your webhooks are never touched. A configuration is rejected if one of your rules could cut off a browser or Google. |
 | **All or nothing** | If downloading the ranges fails, no file is written. The installer backs up, validates, reloads, checks the live site and rolls back by itself if anything is off. |
 
@@ -179,15 +180,44 @@ has not.
 
 | What | Version | What for |
 |---|---|---|
-| Python | 3.11 or later | Running `n-antibot` (standard library only) |
+| Python | 3.9 or later | Running `n-antibot` (standard library only; on 3.9 and 3.10, plus `tomli`) |
 | Caddy | 2.x | If you use the `caddy` output |
 | nginx | 1.x with `geo` and `map` (built in) | If you use the `nginx` output |
 | Apache | 2.4 with `mod_rewrite` | If you use the `apache` output |
 | nftables | Linux, as root | If you use the `nftables` output |
-| Node.js | tested with 24 and 26 | If you use the middleware in `integrations/node/` |
+| Node.js | 18 or later | If you use the middleware in `integrations/node/` |
 | Internet access | to `stat.ripe.net` | Only when generating the lists, not when serving the site |
 
 Nothing has to be installed on the server itself if you generate the file elsewhere and copy it over.
+
+## 🧬 Compatibility
+
+These are the versions the tests run against on every change
+([continuous integration](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml)). Anything not listed
+here is untested, even if it may work.
+
+| Piece | Tested versions | How |
+|---|---|---|
+| **Python** | 3.9, 3.10, 3.11, 3.12, 3.13 and 3.14 | Every test, on each version |
+| **Systems** | Ubuntu 22.04, 24.04 and 26.04, macOS | The tests for the servers available on each system |
+| **Windows** | Windows Server (GitHub) | Generator and command line only: there are no servers to test |
+| **Caddy** | 2.6.2 (Ubuntu 24.04 and 26.04) and 2.11 (macOS) | End to end |
+| **nginx** | 1.18 (Ubuntu 22.04), 1.24 (Ubuntu 24.04) and 1.31 (macOS) | End to end |
+| **Apache** | 2.4.52, 2.4.58, 2.4.66 and 2.4.67 | End to end, in `<VirtualHost>` and in `.htaccess` |
+| **nftables** | 1.0.2 (Ubuntu 22.04) and 1.0.9 (Ubuntu 24.04) | End to end: loads the rules and checks the cut |
+| **Node.js** | 18, 20, 22 and 24 | The middleware, with a real HTTP server |
+| **Cloudflare** | | Not tested on an account: expression checked against their documentation |
+| **Vercel** | | Not tested on a deployment: middleware logic only |
+
+| Compatible with… | Detail |
+|---|---|
+| **IPv4 and IPv6** | In every output. The Node middleware also understands IPv4 written inside IPv6 (`::ffff:1.2.3.4`). |
+| **HTTP/1.1, HTTP/2 and HTTP/3** | The cut is made by IP, `User-Agent` and path, which exist in all three. The firewall covers TCP and UDP. |
+| **Proxies and CDNs** | With the real IP configured: `client_ip` in Caddy, `realip` in nginx, `mod_remoteip` in Apache. |
+| **Docker** | The file is mounted into the container; the firewall also covers ports published by Docker. |
+| **Your current rules** | Caddy: one `import`. nginx: variables with their own prefix. Apache: `Rewrite` rules that live alongside yours. nftables: a separate table. Nothing overwrites what you already have. |
+| **Shared hosting** | Through `.htaccess`, if the host runs Apache 2.4 with `mod_rewrite`. |
+| **Plain-text output** | Generated files and messages are ASCII: no encoding trouble on any console. |
 
 ## 🚀 Installation
 
@@ -201,7 +231,7 @@ Or isolated, with [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-To pin a version, append the tag: `...N-antibot.git@v0.2.0`.
+To pin a version, append the tag: `...N-antibot.git@v0.3.0`.
 
 ### 🟦 Caddy setup
 
@@ -343,7 +373,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.2.0",
+  "generator": "n-antibot 0.3.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],

@@ -2,6 +2,8 @@
 
 [← Back to the README](../../README.en.md) · [🇪🇸 Español](../es/README.md)
 
+> Tested versions of every piece: [compatibility table](../../README.en.md#-compatibility).
+
 ## By technology
 
 Pick the guide for whatever sits **in front of your site** (the first thing that receives the visitor's request).
