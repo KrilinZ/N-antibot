@@ -1,4 +1,4 @@
-"""Command line: n-antibot generate | check | report | test-agent | test-ip | presets | init."""
+"""Command line: n-antibot generate | check | report | serve | test-agent | test-ip | presets | init."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import __version__, report
+from . import __version__, api, claims, report
 from .config import FORMATS, Config, ConfigError, load
 from .core import blocklist
 from .presets import NETWORK_PRESETS, ROBOT_PRESETS
@@ -112,6 +112,38 @@ def cmd_report(a: argparse.Namespace) -> int:
         with open(path, "w", encoding="utf-8", newline="") as f:
             rows = report.write_csv(rep, f, include_clean=a.all_clicks)
         print(f"n-antibot: {rows} ad clicks written to {path}", file=sys.stderr)
+    if a.claim_dir:
+        packs = claims.write_packs(rep, a.claim_dir)
+        for p in packs:
+            how = "" if p["has_process"] else " (the platform documents no process for invalid clicks)"
+            print(
+                f"n-antibot: {p['name']}: {p['clicks']} clicks ({p['within_deadline']} within the deadline) "
+                f"-> {Path(a.claim_dir) / p['files'][0]}{how}",
+                file=sys.stderr,
+            )
+        if not packs:
+            print("n-antibot: no bot or suspicious ad clicks: no claim files written", file=sys.stderr)
+    return 0
+
+
+def cmd_serve(a: argparse.Namespace) -> int:
+    cfg = _config(a)
+    token = os.environ.get("N_ANTIBOT_TOKEN") or None
+    if a.token_file:
+        token = Path(a.token_file).read_text(encoding="utf-8").strip() or None
+    service = api.Service(cfg, a.logs, ranges_ttl=a.refresh_hours * 3600)
+    server = api.make_server(service, a.host, a.port, token, a.cors_origin)
+    host, port = server.server_address[:2]
+    print(
+        f"n-antibot: API on http://{host}:{port} ({'token required' if token else 'no token: local use only'})",
+        flush=True,
+    )
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
     return 0
 
 
@@ -184,11 +216,28 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--until", metavar="YYYY-MM-DD", help="last day to include (UTC)")
     p.add_argument("--csv", metavar="FILE", help="write the bot and suspicious ad clicks to a CSV file")
     p.add_argument("--all-clicks", action="store_true", help="with --csv: include the clean clicks too")
+    p.add_argument(
+        "--claim-dir", metavar="DIR", help="write one claim file per ad platform with what each one asks for"
+    )
     p.add_argument("--json", action="store_true", help="print the summary as JSON")
     p.add_argument(
         "--min-repeat", type=int, default=3, metavar="N", help="ad clicks from one IP to call it repeated (3)"
     )
     p.set_defaults(func=cmd_report)
+
+    p = sub.add_parser("serve", help="read-only JSON API with the report data")
+    common(p, fmt=False)
+    p.add_argument(
+        "logs", nargs="+", help="access logs to read on every request; quote globs: '/var/log/nginx/access.log*'"
+    )
+    p.add_argument("--host", default="127.0.0.1", help="address to listen on (127.0.0.1)")
+    p.add_argument("--port", type=int, default=8787, help="port to listen on (8787)")
+    p.add_argument("--token-file", metavar="FILE", help="file with the access token (or set N_ANTIBOT_TOKEN)")
+    p.add_argument("--cors-origin", metavar="ORIGIN", help="allow a browser dashboard on this origin to call the API")
+    p.add_argument(
+        "--refresh-hours", type=float, default=24, metavar="H", help="refresh the network ranges every H hours (24)"
+    )
+    p.set_defaults(func=cmd_serve)
 
     p = sub.add_parser("presets", help="list built-in network and robot presets")
     p.set_defaults(func=cmd_presets)

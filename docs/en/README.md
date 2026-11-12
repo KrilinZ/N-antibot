@@ -38,6 +38,11 @@ curl -sI https://example.com | grep -i -E '^(server|via|cf-ray|x-vercel-id)'
 [Bot and ad-click report](ads-report.md): how many visits are bots and how many paid clicks (Google Ads, Microsoft
 Ads…) were made by a bot, with a CSV to claim them. ✅ Tested with real logs from Caddy, nginx and Apache.
 
+## Data API
+
+[Data API](api.md): `n-antibot serve`, a read-only JSON API with the bots, the ad clicks and where to claim them.
+✅ Tested with the real server. [OpenAPI specification](../openapi.json).
+
 ## By use case
 
 [Use cases](cases.md): ready-to-copy configurations, each with its file in

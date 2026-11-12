@@ -34,7 +34,8 @@ N-antibot generates a small configuration file for **Caddy**, **nginx**, **Apach
 Google, Bing, AI crawlers, your customers and `curl` keep getting in as usual.
 
 It also **reads your logs and counts how many ad clicks were made by a bot**, with a CSV ready to
-[claim them from Google](docs/en/ads-report.md).
+[claim them from Google, Microsoft and the other platforms](#-where-to-claim-fraudulent-clicks), and an
+[API](#-data-api) to query that data.
 
 ```console
 $ pip install git+https://github.com/KrilinZ/N-antibot.git
@@ -64,6 +65,8 @@ n-antibot: installed: example.com is protected
 - [Built-in lists](#-built-in-lists)
 - [Commands](#️-commands)
 - [Report: bots and ad clicks](#-report-bots-and-ad-clicks)
+- [Where to claim fraudulent clicks](#-where-to-claim-fraudulent-clicks)
+- [Data API](#-data-api)
 - [Python API](#-python-api)
 - [Keeping the lists fresh](#-keeping-the-lists-fresh)
 - [Checking that it works](#-checking-that-it-works)
@@ -235,7 +238,7 @@ Or isolated, with [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-To pin a version, append the tag: `...N-antibot.git@v0.4.0`.
+To pin a version, append the tag: `...N-antibot.git@v0.5.0`.
 
 ### 🟦 Caddy setup
 
@@ -377,7 +380,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.4.0",
+  "generator": "n-antibot 0.5.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -490,6 +493,8 @@ See them at any time with `n-antibot presets`.
 | `n-antibot generate [-c CFG] [-f FORMAT] [-o FILE]` | Downloads ranges and writes the file (or prints it). | `0` ok |
 | `n-antibot check [-c CFG] [-f FORMAT] -o FILE` | Says whether the file is up to date. | `0` up to date · `1` out of date |
 | `n-antibot report [-c CFG] LOG… [--csv FILE]` | Reads access logs: bots and ad clicks made by bots. [Guide](docs/en/ads-report.md). | `0` |
+| `n-antibot report … --claim-dir DIR` | Also one file set per ad platform with what each one asks for. | `0` |
+| `n-antibot serve [-c CFG] LOG…` | Read-only JSON API with that data. [Guide](docs/en/api.md). | `0` |
 | `n-antibot test-agent [-c CFG] "USER-AGENT"` | Would this `User-Agent` be cut off? Uses no network. | `0` blocked · `2` allowed |
 | `n-antibot test-ip [-c CFG] IP` | Would this IP be cut off? | `0` blocked · `2` allowed |
 | `n-antibot presets` | Lists the built-in networks and robots. | `0` |
@@ -540,7 +545,70 @@ n-antibot: 4 ad clicks written to bot-clicks.csv
 > Cutting the bot off does not avoid the charge: the click happens at Google before reaching your site. The money
 > is recovered by claiming, and that is what the CSV is for.
 
-Full guide, with what Google asks for and how to claim: [docs/en/ads-report.md](docs/en/ads-report.md).
+Full guide: [docs/en/ads-report.md](docs/en/ads-report.md).
+
+## 💶 Where to claim fraudulent clicks
+
+What each platform's official documentation says, read on 12 November 2026. Platforms change their rules: open the
+source before you claim.
+
+| Platform | Where to claim | Deadline | What it asks for | What you can expect |
+|---|---|---|---|---|
+| **Google Ads** | [Click Quality Form](https://support.google.com/google-ads/contact/click_quality) | Last 60 days | Dates; campaigns and ad groups; keywords; web server logs with IP, browser and GCLID; why it is suspicious | Specialists review it and email the findings. If they find more invalid traffic, they notify you of the credit. No click-by-click confirmation. [Source](https://support.google.com/google-ads/answer/11182074) |
+| **Microsoft Advertising** (Bing) | [Support](https://go.microsoft.com/fwlink?LinkId=398371), saying it is an "invalid clicks" issue | Best within 30 days; no investigation after 60 | Ad group and its number; ad ID and keywords; dates; what you see in your reports or logs; a log sample if asked | They try to finish within 9 days and recommend reimbursement if the traffic is invalid. [Source](https://help.ads.microsoft.com/#apex/ads/en/60220/0) |
+| **LinkedIn Ads** | [Marketing Solutions support](https://www.linkedin.com/help/lms/ask), in writing | 90 days | The fees you dispute and why | Ad credit only, at LinkedIn's discretion; no cash refund. [Source](https://www.linkedin.com/legal/sas-terms) |
+| **X Ads** | [Support ticket](https://ads.x.com/en/help), in writing | 60 days from the charge (US agreement) | The charges you dispute | A refund only if they find a billing or technical error. [Source](https://help.x.com/en/business-and-advertising/billing-basics) |
+| **Meta Ads** (Facebook, Instagram) | [Ads payment support form](https://www.facebook.com/help/contact/649167531904667). **No documented process for invalid clicks** | None stated | It does not say | Decided case by case, at Meta's discretion, and final. At least one month. No refunds for poor performance. [Source](https://www.facebook.com/business/help/211313200321572) |
+| **Pinterest Ads** | Support. **No documented process for invalid clicks** | None stated | It does not say | It says standard charges are usually not eligible for a refund. [Source](https://help.pinterest.com/en/business/article/refunds-and-chargebacks) |
+| **TikTok Ads, Amazon Ads** | No process found in their help (searched only; their pages were not opened one by one) | | | |
+
+`n-antibot report --claim-dir claim/` prepares **one file set per platform** with what each one asks for:
+
+```console
+$ n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --claim-dir claim/
+n-antibot: Google Ads: 4 clicks (4 within the deadline) -> claim/google-claim.txt
+n-antibot: Meta Ads (Facebook, Instagram): 1 clicks (1 within the deadline) -> claim/meta-claim.txt (the platform documents no process for invalid clicks)
+```
+
+| File | Content |
+|---|---|
+| `google-claim.txt` | Where to claim, the deadline, what the platform asks for, how many clicks are still within the deadline, the IPs with the reason, and **a text ready to paste** explaining why they are suspicious |
+| `google-clicks.csv` | One click per row: date and time (UTC), `click_id` (GCLID), IP, browser, verdict, reason, network and ASN, campaign, ad group, ad and keyword (when the URL carries them) and whether it is within the deadline |
+| `google-log-sample.log` | The exact web server log lines of those clicks |
+
+What the log cannot know and you must add: your account ID and the campaign, ad group and keyword names of the
+clicks whose URL does not carry them. If you add those to your tracking template (`utm_campaign`, `utm_term`…), the
+next report already has them.
+
+> [!WARNING]
+> **Cutting the bot off does not avoid the charge:** the click happens at the platform before the visit reaches
+> your site. And no platform guarantees a refund: they all decide themselves, and several only give ad credit.
+
+## 🔌 Data API
+
+`n-antibot serve` starts a read-only JSON API with the same data: for your dashboard, a spreadsheet or an alert.
+
+```console
+$ export N_ANTIBOT_TOKEN="$(openssl rand -hex 24)"
+$ n-antibot serve '/var/log/nginx/access.log*'
+n-antibot: API on http://127.0.0.1:8787 (token required)
+$ curl -H "Authorization: Bearer $N_ANTIBOT_TOKEN" "http://127.0.0.1:8787/v1/ad-clicks?verdict=bot&platform=google"
+```
+
+| Endpoint | What it returns |
+|---|---|
+| `GET /v1/summary` | Requests, bots and ad clicks per platform |
+| `GET /v1/bots` | Bots by network and by robot, and the busiest unblocked visitors |
+| `GET /v1/ad-clicks` | Ad clicks one by one, with filters, paging and CSV |
+| `GET /v1/claims` | Where to claim on each platform, what it asks for and how many clicks you have within the deadline |
+| `GET /v1/check` | Whether an IP or a browser would be blocked |
+| `GET /v1/blocklist` | The ranges and robots in use |
+| `GET /health`, `GET /v1/openapi.json` | Service status and OpenAPI 3.1 specification (no token) |
+
+It only listens on `127.0.0.1` unless you give it a token; the token goes in the header, never in the URL.
+
+Full guide, with every parameter, every field, errors, examples and deployment:
+[docs/en/api.md](docs/en/api.md) · [openapi.json](docs/openapi.json).
 
 ## 🐍 Python API
 
@@ -715,6 +783,8 @@ N-antibot/
 │   ├── ranges.py       # RIPEstat download, merging and subtracting ranges
 │   ├── render.py       # outputs: Caddy, nginx, Apache, nftables, Cloudflare and JSON
 │   ├── report.py       # report from the logs: bots and ad clicks
+│   ├── claims.py       # where each ad platform takes claims, and the per-platform file set
+│   ├── api.py          # read-only API (n-antibot serve)
 │   ├── core.py         # generate(): from configuration to file
 │   ├── cli.py          # command line
 │   └── example.toml    # example configuration (n-antibot init)

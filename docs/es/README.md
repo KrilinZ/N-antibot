@@ -39,6 +39,11 @@ curl -sI https://example.com | grep -i -E '^(server|via|cf-ray|x-vercel-id)'
 (Google Ads, Microsoft Ads…) los hizo un bot, con un CSV para reclamarlos. ✅ Probado con registros reales de Caddy,
 nginx y Apache.
 
+## API de datos
+
+[API de datos](api.md): `n-antibot serve`, una API de solo lectura en JSON con los bots, los clics de anuncios y
+dónde reclamarlos. ✅ Probada con el servidor real. [Especificación OpenAPI](../openapi.json).
+
 ## Por caso de uso
 
 [Casos de uso](casos.md): configuraciones listas para copiar, cada una con su archivo en

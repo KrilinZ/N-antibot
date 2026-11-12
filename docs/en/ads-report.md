@@ -8,8 +8,8 @@
 `n-antibot report` reads your server's access logs and answers two questions:
 
 1. **How many visits are bots**, from which networks and robots, and how many were cut off?
-2. **How many paid ad clicks were made by a bot?** With date, IP, browser and `gclid`, in a CSV ready to ask Google
-   to investigate them.
+2. **How many paid ad clicks were made by a bot?** With date, IP, browser and `gclid`, in a CSV ready to claim
+   them, plus one file set per platform with what each one asks for.
 
 It sends nothing anywhere: it reads your files on your machine. The only thing it downloads is the network ranges,
 just like `generate`.
@@ -60,6 +60,7 @@ IP addresses behind bot and suspicious ad clicks (clicks, IP, why)
 | `--until YYYY-MM-DD` | Last day to include (UTC). |
 | `--csv FILE` | Writes the bot and suspicious ad clicks to a CSV. |
 | `--all-clicks` | With `--csv`: include the clean clicks too. |
+| `--claim-dir DIR` | Writes one file set per ad platform with what each one asks for. See [Claiming](#claiming-bot-clicks). |
 | `--json` | Prints the summary as JSON, for your dashboard or alerts. |
 | `--min-repeat N` | Ad clicks from one IP to flag it as repeated (default 3). |
 
@@ -88,7 +89,7 @@ By the identifier the platform appends to the landing URL:
 | Google Ads | `gclid`, `gbraid`, `wbraid` |
 | Microsoft Ads | `msclkid` |
 | TikTok, X, LinkedIn | `ttclid`, `twclid`, `li_fat_id` |
-| Any other | `utm_medium` = `cpc`, `ppc`, `paid`, `paid-social`, `display`… (the platform comes from `utm_source`) |
+| Meta and any other | `utm_medium` = `cpc`, `ppc`, `paid`, `paid-social`, `display`… The platform comes from `utm_source` (`facebook`, `instagram`, `fb`, `ig` and `meta` count as Meta) |
 
 Each identifier counts **only once**, even if the visitor reloads the page. `fbclid` does not count: Meta appends it
 to every link, paid or not.
@@ -110,46 +111,65 @@ to every link, paid or not.
 "Hints" are not proof: a whole office may share one IP, and a browser may have the page cached. They help you
 decide what to look at, not to claim fraud.
 
-## Claiming bot clicks from Google
+## Claiming bot clicks
 
-Google describes the process in [About invalid traffic](https://support.google.com/google-ads/answer/11182074): it
-filters the invalid traffic it detects on its own and, if you request an investigation and it finds more, it
-**notifies you of the credit**. The investigation covers **the last 60 days** and is requested with the
-[Click Quality Form](https://support.google.com/google-ads/contact/click_quality).
+What each platform's official documentation says, read on 12 November 2026. Open the source before claiming: rules
+change.
 
-This is what Google asks for and where it comes from:
+| Platform | Where to claim | Deadline | What it asks for | What you can expect |
+|---|---|---|---|---|
+| **Google Ads** | [Click Quality Form](https://support.google.com/google-ads/contact/click_quality) | Last 60 days | Dates; campaigns and ad groups; keywords; web server logs with IP, browser and GCLID; why it is suspicious | Specialists review it and email the findings. If they find more invalid traffic, they notify you of the credit. No click-by-click confirmation. [Source](https://support.google.com/google-ads/answer/11182074) |
+| **Microsoft Advertising** (Bing) | [Support](https://go.microsoft.com/fwlink?LinkId=398371), saying it is an "invalid clicks" issue | Best within 30 days; no investigation after 60 | Ad group and its number; ad ID and keywords; dates; what you see in your reports or logs; a log sample if asked | They try to finish within 9 days and recommend reimbursement if the traffic is invalid. [Source](https://help.ads.microsoft.com/#apex/ads/en/60220/0) |
+| **LinkedIn Ads** | [Marketing Solutions support](https://www.linkedin.com/help/lms/ask), in writing | 90 days | The fees you dispute and why | Ad credit only, at LinkedIn's discretion; no cash refund. [Source](https://www.linkedin.com/legal/sas-terms) |
+| **X Ads** | [Support ticket](https://ads.x.com/en/help), in writing | 60 days from the charge (US agreement) | The charges you dispute | A refund only if they find a billing or technical error. [Source](https://help.x.com/en/business-and-advertising/billing-basics) |
+| **Meta Ads** (Facebook, Instagram) | [Ads payment support form](https://www.facebook.com/help/contact/649167531904667). **No documented process for invalid clicks** | None stated | It does not say | Decided case by case, at Meta's discretion, and final. At least one month. No refunds for poor performance. [Source](https://www.facebook.com/business/help/211313200321572) |
+| **Pinterest Ads** | Support. **No documented process for invalid clicks** | None stated | It does not say | It says standard charges are usually not eligible for a refund. [Source](https://help.pinterest.com/en/business/article/refunds-and-chargebacks) |
+| **TikTok Ads, Amazon Ads** | No process found in their help (searched only; their pages were not opened one by one) | | | |
 
-| Google asks for | Where it comes from |
-|---|---|
-| Date range (last 60 days) | `--since` and `--until`; the report prints the period |
-| IP addresses with repetitive clicks or no conversions | The `ip` column of the CSV and the "IP addresses behind…" list |
-| Browser or device | The `user_agent` column |
-| **GCLIDs** of the suspicious clicks | The `click_id` column |
-| Web server logs | The access log itself |
-| Why it is suspicious | The `reason` and `detail` columns (network, ASN, robot) |
-| Campaigns, ad groups and keywords | Your Google Ads account: the log does not know them |
+### The file set per platform
+
+`--claim-dir` writes, for every platform with bot or suspicious clicks, three files with what each one asks for:
 
 ```bash
-n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --until 2026-11-12 --csv bot-clicks.csv
+n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --claim-dir claim/
 ```
 
-```csv
-date_utc,time_utc,platform,click_id,ip,verdict,reason,detail,cut_off,status,user_agent,url
-2026-11-12,09:00:01,google,AAA111,43.173.132.9,bot,from a blocked network,AS132203 (tencent-cloud) 43.173.0.0/16,yes,444,Mozilla/5.0 (Windows NT 10.0…,/producto/a/?gclid=AAA111
-```
+| File | Content |
+|---|---|
+| `<platform>-claim.txt` | Where to claim, the deadline, what the platform asks for, how many clicks are still within the deadline, a summary, the IPs with the reason and a text ready to paste |
+| `<platform>-clicks.csv` | One click per row, with every column below |
+| `<platform>-log-sample.log` | The exact web server log lines of those clicks (up to 500) |
+
+| What they ask for | CSV column | Where it comes from |
+|---|---|---|
+| Dates | `date_utc`, `time_utc` | The log |
+| GCLID or other click identifier | `click_id` | The URL (`gclid`, `msclkid`…) |
+| IP address | `ip` | The log |
+| Browser or device | `user_agent` | The log |
+| Why it is suspicious | `verdict`, `reason`, `detail` | N-antibot: network with its ASN, robot or hint |
+| Campaign | `campaign` | `utm_campaign`, `gad_campaignid`, `campaignid` |
+| Ad group | `ad_group` | `utm_adgroup`, `adgroupid`, `adset_id` |
+| Ad | `ad_id` | `adid`, `ad_id`, `creative`, `utm_content` |
+| Keyword | `keyword` | `utm_term`, `keyword` |
+| Whether it can still be claimed | `within_deadline` | The platform's deadline (60 or 90 days) |
+| Whether the visit was cut off | `cut_off`, `status` | The log |
+
+Campaign, ad group, ad and keyword only appear when the landing URL carries them. To make it carry them, add them to
+the campaign's tracking template; for example, in Google Ads:
+`{lpurl}?utm_campaign={campaignid}&utm_adgroup={adgroupid}&utm_content={creative}&utm_term={keyword}`.
 
 > [!WARNING]
-> **Cutting the bot off does not avoid the charge.** The click happens at Google before the visit reaches your
+> **Cutting the bot off does not avoid the charge.** The click happens at the platform before the visit reaches your
 > site. N-antibot keeps the bot from using your server and polluting your statistics; the money is recovered by
-> claiming.
+> claiming, and no platform guarantees it.
 
 Three things worth knowing before you claim:
 
-- **Google may not have charged you already.** Check the "Invalid traffic" card on your account's Overview page and the invalid
-  clicks columns first: some of these clicks may already be discounted.
+- **You may not have been charged.** Platforms filter part of the invalid traffic on their own. In Google Ads, check
+  the "Invalid traffic" card on your account's Overview page first.
 - **Google does not confirm click by click.** Its help says an investigation will not tell which specific clicks
   were marked valid or invalid; if it finds additional invalid traffic, it notifies you of the credit.
-- **CSV times are in UTC.** Keep that in mind when comparing them with Google Ads reports.
+- **CSV times are in UTC.** Keep that in mind when comparing them with the platform's reports.
 
 ## Privacy
 

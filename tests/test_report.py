@@ -72,7 +72,10 @@ def test_ad_click_detection():
     assert report.ad_click("/p/?x=1&gbraid=g1") == ("google", "g1")
     assert report.ad_click("/?wbraid=w1") == ("google", "w1")
     assert report.ad_click("/?msclkid=m1") == ("microsoft", "m1")
-    assert report.ad_click("/?utm_source=Facebook&utm_medium=CPC") == ("facebook", "")
+    assert report.ad_click("/?utm_source=Facebook&utm_medium=CPC") == ("meta", "")
+    assert report.ad_click("/?utm_source=ig&utm_medium=paid-social") == ("meta", "")
+    assert report.ad_click("/?utm_source=bing&utm_medium=cpc") == ("microsoft", "")
+    assert report.ad_click("/?utm_source=newsletter&utm_medium=cpc") == ("newsletter", "")
     for organic in ["/", "/p/?page=2", "/?utm_medium=email", "/?utm_medium=organic", "/?gclid=", "/?fbclid=abc"]:
         assert report.ad_click(organic) is None, organic
 
@@ -100,8 +103,8 @@ def test_analyze_counts_bots_and_ad_clicks():
     google = rep.clicks_by("google")
     assert google == {"total": 7, "network": 1, "agent": 1, "clean": 1, "no-resources": 1, "repeated": 3}
     assert rep.clicks_by("microsoft") == {"total": 1, "clean": 1}
-    assert rep.clicks_by("facebook") == {"total": 1, "clean": 1}
-    assert rep.platforms() == ["google", "facebook", "microsoft"]
+    assert rep.clicks_by("meta") == {"total": 1, "clean": 1}
+    assert rep.platforms() == ["google", "meta", "microsoft"]
     net = next(c for c in rep.clicks if c.click_id == "NET-1")
     assert net.cut and net.first.status == 444 and "43.173.0.0/16" in net.detail
     ua = next(c for c in rep.clicks if c.click_id == "UA-1")
@@ -113,7 +116,7 @@ def test_analyze_counts_bots_and_ad_clicks():
 def test_since_until_and_min_repeat():
     day = datetime(2026, 11, 13, tzinfo=timezone.utc)
     second = report.analyze(LOG, classifier(), since=day)
-    assert second.requests == 5 and second.platforms() == ["facebook", "microsoft"]
+    assert second.requests == 5 and second.platforms() == ["meta", "microsoft"]
     first = report.analyze(LOG, classifier(), until=day)
     assert first.requests == 10 and first.platforms() == ["google"]
     strict = report.analyze(LOG, classifier(), min_repeat=4)
@@ -143,6 +146,10 @@ def test_csv_and_json_outputs():
         "cut_off": "yes",
         "status": "444",
         "user_agent": CHROME,
+        "campaign": "",
+        "ad_group": "",
+        "ad_id": "",
+        "keyword": "",
         "url": "/p/a/?gclid=NET-1",
     }
     everything = io.StringIO()

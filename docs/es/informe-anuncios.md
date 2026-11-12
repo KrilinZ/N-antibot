@@ -9,7 +9,7 @@
 
 1. **¿Cuántas visitas son de bots**, de qué redes y robots, y cuántas se han cortado?
 2. **¿Cuántos clics de anuncios de pago los hizo un bot?** Con su fecha, IP, navegador y `gclid`, en un CSV listo
-   para pedir a Google que los investigue.
+   para reclamarlos, y un expediente por plataforma con lo que pide cada una.
 
 No envía nada a ningún sitio: lee tus archivos en tu máquina. Lo único que descarga son los rangos de las redes,
 igual que `generate`.
@@ -60,6 +60,7 @@ IP addresses behind bot and suspicious ad clicks (clicks, IP, why)
 | `--until AAAA-MM-DD` | Último día que se incluye (UTC). |
 | `--csv ARCHIVO` | Escribe los clics de anuncios de bots y sospechosos en un CSV. |
 | `--all-clicks` | Con `--csv`: incluye también los clics limpios. |
+| `--claim-dir CARPETA` | Escribe un expediente por plataforma de anuncios con lo que pide cada una. Ver [Reclamar](#reclamar-los-clics-de-bots). |
 | `--json` | Imprime el resumen en JSON, para tu panel o tus alertas. |
 | `--min-repeat N` | Clics de anuncios desde una misma IP para marcarla como repetida (por defecto 3). |
 
@@ -88,7 +89,7 @@ Por el identificador que la plataforma añade a la dirección de destino:
 | Google Ads | `gclid`, `gbraid`, `wbraid` |
 | Microsoft Ads | `msclkid` |
 | TikTok, X, LinkedIn | `ttclid`, `twclid`, `li_fat_id` |
-| Cualquier otra | `utm_medium` = `cpc`, `ppc`, `paid`, `paid-social`, `display`… (la plataforma sale de `utm_source`) |
+| Meta y cualquier otra | `utm_medium` = `cpc`, `ppc`, `paid`, `paid-social`, `display`… La plataforma sale de `utm_source` (`facebook`, `instagram`, `fb`, `ig` y `meta` cuentan como Meta) |
 
 Cada identificador cuenta **una sola vez**, aunque el visitante recargue la página. `fbclid` no cuenta: Meta lo
 añade a todos los enlaces, de pago o no.
@@ -110,45 +111,65 @@ añade a todos los enlaces, de pago o no.
 Los «indicios» no son pruebas: una oficina entera puede salir por la misma IP, y un navegador puede tener la página
 en caché. Sirven para decidir qué mirar, no para afirmar que es fraude.
 
-## Reclamar a Google los clics de bots
+## Reclamar los clics de bots
 
-Google explica el proceso en [Acerca del tráfico no válido](https://support.google.com/google-ads/answer/11182074):
-filtra por su cuenta el tráfico no válido que detecta y, si le pides una investigación y encuentra más, **te avisa
-del abono**. La investigación cubre **los últimos 60 días** y se pide con el
-[formulario de calidad de clics](https://support.google.com/google-ads/contact/click_quality).
+Lo que dice la documentación oficial de cada plataforma, leída el 12-nov-2026. Abre la fuente antes de reclamar:
+las normas cambian.
 
-Esto es lo que pide Google y de dónde sale:
+| Plataforma | Dónde se reclama | Plazo | Qué pide | Qué puedes esperar |
+|---|---|---|---|---|
+| **Google Ads** | [Formulario de calidad de clics](https://support.google.com/google-ads/contact/click_quality) | Últimos 60 días | Fechas; campañas y grupos de anuncios; palabras clave; registros del servidor con IP, navegador y GCLID; por qué es sospechoso | Lo revisan especialistas y avisan por correo. Si encuentran más tráfico no válido, avisan del abono. No confirman clic a clic. [Fuente](https://support.google.com/google-ads/answer/11182074) |
+| **Microsoft Advertising** (Bing) | [Soporte](https://go.microsoft.com/fwlink?LinkId=398371), diciendo que es un problema de «invalid clicks» | Mejor en 30 días; pasados 60 no investigan | Grupo de anuncios y su número; ID del anuncio y palabras clave; fechas; qué ves en tus informes o registros; una muestra del registro si la piden | Intentan resolver en 9 días y recomiendan el reembolso si el tráfico es no válido. [Fuente](https://help.ads.microsoft.com/#apex/ads/en/60220/0) |
+| **LinkedIn Ads** | [Soporte de Marketing Solutions](https://www.linkedin.com/help/lms/ask), por escrito | 90 días | Los cargos que disputas y el motivo | Solo crédito publicitario, a criterio de LinkedIn; no devuelven dinero. [Fuente](https://www.linkedin.com/legal/sas-terms) |
+| **X Ads** | [Ticket de soporte](https://ads.x.com/en/help), por escrito | 60 días desde el cargo (acuerdo de EE. UU.) | Los cargos que disputas | Solo devuelven si encuentran un error técnico o de facturación. [Fuente](https://help.x.com/en/business-and-advertising/billing-basics) |
+| **Meta Ads** (Facebook, Instagram) | [Formulario de pagos de anuncios](https://www.facebook.com/help/contact/649167531904667). **No documenta una vía para clics no válidos** | No indica | No lo dice | Deciden caso por caso, a su criterio, y la decisión es definitiva. Tarda al menos un mes. No devuelven por mal rendimiento. [Fuente](https://www.facebook.com/business/help/211313200321572) |
+| **Pinterest Ads** | Soporte. **No documenta una vía para clics no válidos** | No indica | No lo dice | Dice que los cargos normales no suelen devolverse. [Fuente](https://help.pinterest.com/en/business/article/refunds-and-chargebacks) |
+| **TikTok Ads, Amazon Ads** | Sin vía encontrada en su ayuda (solo se buscó; sus páginas no se abrieron una a una) | | | |
 
-| Google pide | De dónde sale |
-|---|---|
-| Intervalo de fechas (últimos 60 días) | `--since` y `--until`; el informe imprime el periodo |
-| Direcciones IP con clics repetidos o sin conversión | Columna `ip` del CSV y la lista «IP addresses behind…» |
-| Navegador o dispositivo | Columna `user_agent` |
-| **GCLID** de los clics sospechosos | Columna `click_id` |
-| Registros del servidor | El propio archivo de accesos |
-| Por qué es sospechoso | Columnas `reason` y `detail` (red, ASN, robot) |
-| Campañas, grupos de anuncios y palabras clave | De tu cuenta de Google Ads: el registro no lo sabe |
+### El expediente por plataforma
+
+`--claim-dir` escribe, por cada plataforma con clics de bots o sospechosos, tres archivos con lo que pide cada una:
 
 ```bash
-n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --until 2026-11-12 --csv clics-bots.csv
+n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --claim-dir reclamacion/
 ```
 
-```csv
-date_utc,time_utc,platform,click_id,ip,verdict,reason,detail,cut_off,status,user_agent,url
-2026-11-12,09:00:01,google,AAA111,43.173.132.9,bot,from a blocked network,AS132203 (tencent-cloud) 43.173.0.0/16,yes,444,Mozilla/5.0 (Windows NT 10.0…,/producto/a/?gclid=AAA111
-```
+| Archivo | Contenido |
+|---|---|
+| `<plataforma>-claim.txt` | Dónde reclamar, plazo, lo que pide la plataforma, cuántos clics siguen dentro de plazo, resumen, las IP con su motivo y un texto listo para pegar |
+| `<plataforma>-clicks.csv` | Un clic por fila, con todas las columnas de abajo |
+| `<plataforma>-log-sample.log` | Las líneas exactas del registro del servidor de esos clics (hasta 500) |
+
+| Lo que piden | Columna del CSV | De dónde sale |
+|---|---|---|
+| Fechas | `date_utc`, `time_utc` | El registro |
+| GCLID u otro identificador del clic | `click_id` | La dirección (`gclid`, `msclkid`…) |
+| Dirección IP | `ip` | El registro |
+| Navegador o dispositivo | `user_agent` | El registro |
+| Por qué es sospechoso | `verdict`, `reason`, `detail` | N-antibot: red con su ASN, robot o indicio |
+| Campaña | `campaign` | `utm_campaign`, `gad_campaignid`, `campaignid` |
+| Grupo de anuncios | `ad_group` | `utm_adgroup`, `adgroupid`, `adset_id` |
+| Anuncio | `ad_id` | `adid`, `ad_id`, `creative`, `utm_content` |
+| Palabra clave | `keyword` | `utm_term`, `keyword` |
+| Si aún se puede reclamar | `within_deadline` | El plazo de la plataforma (60 o 90 días) |
+| Si la visita se cortó | `cut_off`, `status` | El registro |
+
+Campaña, grupo, anuncio y palabra clave solo salen si la dirección de destino los lleva. Para que los lleve, añádelos
+a la plantilla de seguimiento de la campaña; por ejemplo, en Google Ads:
+`{lpurl}?utm_campaign={campaignid}&utm_adgroup={adgroupid}&utm_content={creative}&utm_term={keyword}`.
 
 > [!WARNING]
-> **Cortar al bot no evita el cobro.** El clic se produce en Google antes de que la visita llegue a tu web. N-antibot
-> evita que el bot use tu servidor y ensucie tus estadísticas; el dinero se recupera reclamando.
+> **Cortar al bot no evita el cobro.** El clic se produce en la plataforma antes de que la visita llegue a tu web.
+> N-antibot evita que el bot use tu servidor y ensucie tus estadísticas; el dinero se recupera reclamando, y ninguna
+> plataforma lo garantiza.
 
 Tres cosas que conviene saber antes de reclamar:
 
-- **Puede que Google ya no te lo haya cobrado.** Mira antes la tarjeta de tráfico no válido («Invalid traffic») de la página de resumen de tu cuenta y las
-  columnas de clics no válidos: parte de estos clics puede estar ya descontada.
+- **Puede que no te lo hayan cobrado.** Las plataformas filtran por su cuenta parte del tráfico no válido. En Google
+  Ads, mira antes la tarjeta de tráfico no válido («Invalid traffic») de la página de resumen de tu cuenta.
 - **Google no confirma clic a clic.** Su ayuda dice que la investigación no indica qué clics concretos dio por
   válidos o no válidos; si encuentra tráfico no válido adicional, avisa del abono.
-- **Las horas del CSV van en UTC.** Tenlo en cuenta al compararlas con los informes de Google Ads.
+- **Las horas del CSV van en UTC.** Tenlo en cuenta al compararlas con los informes de la plataforma.
 
 ## Privacidad
 

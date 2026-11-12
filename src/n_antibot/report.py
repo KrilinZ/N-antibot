@@ -43,6 +43,26 @@ AD_CLICK_IDS = {
     "twclid": "x",
     "li_fat_id": "linkedin",
 }
+# utm_source spellings of the same platform.
+SOURCES = {
+    "facebook": "meta",
+    "fb": "meta",
+    "instagram": "meta",
+    "ig": "meta",
+    "meta": "meta",
+    "adwords": "google",
+    "googleads": "google",
+    "bing": "microsoft",
+    "msn": "microsoft",
+    "twitter": "x",
+}
+# Where campaign details travel in a landing URL: UTM first, then each platform's usual parameter names.
+AD_FIELDS = {
+    "campaign": ("utm_campaign", "gad_campaignid", "campaignid", "campaign_id", "utm_id"),
+    "ad_group": ("utm_adgroup", "adgroupid", "adgroup_id", "adset_id", "utm_adset"),
+    "ad_id": ("adid", "ad_id", "creative", "utm_content"),
+    "keyword": ("utm_term", "keyword"),
+}
 PAID_MEDIUMS = {"cpc", "ppc", "paid", "paidsearch", "paid-search", "paidsocial", "paid-social", "display", "cpm"}
 
 
@@ -128,8 +148,16 @@ def ad_click(uri: str) -> tuple[str, str] | None:
     medium = (params.get("utm_medium") or [""])[0].lower()
     if medium in PAID_MEDIUMS:
         source = (params.get("utm_source") or ["other"])[0].lower()
-        return source, ""
+        return SOURCES.get(source, source), ""
     return None
+
+
+def ad_fields(uri: str) -> dict[str, str]:
+    """Campaign, ad group, ad and keyword, when the landing URL carries them (UTM or the platform's own parameters)."""
+    params = parse_qs(urlsplit(uri).query)
+    return {
+        field: next((params[name][0] for name in names if params.get(name)), "") for field, names in AD_FIELDS.items()
+    }
 
 
 class Classifier:
@@ -204,6 +232,7 @@ class AdClick:
     reason: str = ""  # network | agent | repeated | no-resources | ""
     detail: str = ""
     cut: bool = False
+    raw: str = ""  # the log line of the click, as evidence
 
 
 @dataclass
@@ -287,7 +316,7 @@ def analyze(
                 click_id = f"(no id) {hit.ip} {path}"
             key = (platform, click_id)
             if key not in clicks:
-                clicks[key] = AdClick(platform, click_id, hit)
+                clicks[key] = AdClick(platform, click_id, hit, raw=line.strip())
                 clicks_per_ip[hit.ip].add(key)
             click = clicks[key]
             if verdict and not click.reason:
@@ -391,6 +420,10 @@ CSV_HEADER = [
     "cut_off",
     "status",
     "user_agent",
+    "campaign",
+    "ad_group",
+    "ad_id",
+    "keyword",
     "url",
 ]
 
@@ -418,6 +451,7 @@ def write_csv(rep: Report, target: io.TextIOBase, *, include_clean: bool = False
                 "yes" if c.cut else "no",
                 c.first.status,
                 c.first.ua,
+                *ad_fields(c.first.uri).values(),
                 c.first.uri,
             ]
         )
@@ -445,4 +479,29 @@ def as_dict(rep: Report) -> dict[str, Any]:
         "top_unblocked": [
             {"ip": ip, "requests": n, "resources": a, "user_agent": ua} for ip, n, a, ua in rep.top_unblocked
         ],
+    }
+
+
+def click_verdict(c: AdClick) -> str:
+    return "bot" if c.reason in ("network", "agent") else ("suspicious" if c.reason else "clean")
+
+
+def click_dict(c: AdClick) -> dict[str, Any]:
+    """One ad click as plain data (the JSON twin of a CSV row)."""
+    ts = c.first.ts
+    return {
+        "timestamp": ts.isoformat() if ts else None,
+        "date_utc": f"{ts:%Y-%m-%d}" if ts else None,
+        "time_utc": f"{ts:%H:%M:%S}" if ts else None,
+        "platform": c.platform,
+        "click_id": c.click_id,
+        "ip": c.first.ip,
+        "verdict": click_verdict(c),
+        "reason": REASONS.get(c.reason),
+        "detail": c.detail or None,
+        "cut_off": c.cut,
+        "status": c.first.status,
+        "user_agent": c.first.ua,
+        **{k: v or None for k, v in ad_fields(c.first.uri).items()},
+        "url": c.first.uri,
     }

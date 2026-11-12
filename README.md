@@ -34,7 +34,8 @@ Linux**, **Cloudflare** o tu aplicación **Node.js** que corta, sin llegar a tu 
 Google, Bing, los robots de IA, tus clientes y `curl` siguen entrando con normalidad.
 
 Además, **lee tus registros y cuenta cuántos clics de anuncios los hizo un bot**, con un CSV listo para
-[reclamárselos a Google](docs/es/informe-anuncios.md).
+[reclamarlos a Google, Microsoft y las demás plataformas](#-dónde-reclamar-los-clics-fraudulentos), y una
+[API](#-api-de-datos) para consultar esos datos.
 
 ```console
 $ pip install git+https://github.com/KrilinZ/N-antibot.git
@@ -64,6 +65,8 @@ n-antibot: installed: example.com is protected
 - [Listas incluidas](#-listas-incluidas)
 - [Comandos](#️-comandos)
 - [Informe: bots y clics de anuncios](#-informe-bots-y-clics-de-anuncios)
+- [Dónde reclamar los clics fraudulentos](#-dónde-reclamar-los-clics-fraudulentos)
+- [API de datos](#-api-de-datos)
 - [Uso desde Python](#-uso-desde-python)
 - [Mantener las listas al día](#-mantener-las-listas-al-día)
 - [Comprobar que funciona](#-comprobar-que-funciona)
@@ -235,7 +238,7 @@ O aislado, con [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.4.0`.
+Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.5.0`.
 
 ### 🟦 Instalación en Caddy
 
@@ -377,7 +380,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.4.0",
+  "generator": "n-antibot 0.5.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -490,6 +493,8 @@ Míralas en cualquier momento con `n-antibot presets`.
 | `n-antibot generate [-c CFG] [-f FORMATO] [-o ARCHIVO]` | Descarga rangos y escribe el archivo (o lo imprime). | `0` bien |
 | `n-antibot check [-c CFG] [-f FORMATO] -o ARCHIVO` | Dice si el archivo está al día. | `0` al día · `1` desactualizado |
 | `n-antibot report [-c CFG] REGISTRO… [--csv ARCHIVO]` | Lee registros de acceso: bots y clics de anuncios hechos por bots. [Guía](docs/es/informe-anuncios.md). | `0` |
+| `n-antibot report … --claim-dir CARPETA` | Además, un expediente por plataforma de anuncios con lo que pide cada una. | `0` |
+| `n-antibot serve [-c CFG] REGISTRO…` | API de solo lectura en JSON con esos datos. [Guía](docs/es/api.md). | `0` |
 | `n-antibot test-agent [-c CFG] "USER-AGENT"` | ¿Se cortaría este `User-Agent`? No usa la red. | `0` cortado · `2` pasa |
 | `n-antibot test-ip [-c CFG] IP` | ¿Se cortaría esta IP? | `0` cortada · `2` pasa |
 | `n-antibot presets` | Lista las redes y robots incluidos. | `0` |
@@ -540,7 +545,71 @@ n-antibot: 4 ad clicks written to clics-bots.csv
 > Cortar al bot no evita el cobro: el clic se produce en Google antes de llegar a tu web. El dinero se recupera
 > reclamando, y para eso es el CSV.
 
-Guía completa, con qué pide Google y cómo reclamar: [docs/es/informe-anuncios.md](docs/es/informe-anuncios.md).
+Guía completa: [docs/es/informe-anuncios.md](docs/es/informe-anuncios.md).
+
+## 💶 Dónde reclamar los clics fraudulentos
+
+Lo que dice la documentación oficial de cada plataforma, leída el 12-nov-2026. Las plataformas cambian sus normas:
+abre la fuente antes de reclamar.
+
+| Plataforma | Dónde se reclama | Plazo | Qué pide | Qué puedes esperar |
+|---|---|---|---|---|
+| **Google Ads** | [Formulario de calidad de clics](https://support.google.com/google-ads/contact/click_quality) | Últimos 60 días | Fechas; campañas y grupos de anuncios; palabras clave; registros del servidor con IP, navegador y GCLID; por qué es sospechoso | Lo revisan especialistas y avisan por correo. Si encuentran más tráfico no válido, avisan del abono. No confirman clic a clic. [Fuente](https://support.google.com/google-ads/answer/11182074) |
+| **Microsoft Advertising** (Bing) | [Soporte](https://go.microsoft.com/fwlink?LinkId=398371), diciendo que es un problema de «invalid clicks» | Mejor en 30 días; pasados 60 no investigan | Grupo de anuncios y su número; ID del anuncio y palabras clave; fechas; qué ves en tus informes o registros; una muestra del registro si la piden | Intentan resolver en 9 días y recomiendan el reembolso si el tráfico es no válido. [Fuente](https://help.ads.microsoft.com/#apex/ads/en/60220/0) |
+| **LinkedIn Ads** | [Soporte de Marketing Solutions](https://www.linkedin.com/help/lms/ask), por escrito | 90 días | Los cargos que disputas y el motivo | Solo crédito publicitario, a criterio de LinkedIn; no devuelven dinero. [Fuente](https://www.linkedin.com/legal/sas-terms) |
+| **X Ads** | [Ticket de soporte](https://ads.x.com/en/help), por escrito | 60 días desde el cargo (acuerdo de EE. UU.) | Los cargos que disputas | Solo devuelven si encuentran un error técnico o de facturación. [Fuente](https://help.x.com/en/business-and-advertising/billing-basics) |
+| **Meta Ads** (Facebook, Instagram) | [Formulario de pagos de anuncios](https://www.facebook.com/help/contact/649167531904667). **No documenta una vía para clics no válidos** | No indica | No lo dice | Deciden caso por caso, a su criterio, y la decisión es definitiva. Tarda al menos un mes. No devuelven por mal rendimiento. [Fuente](https://www.facebook.com/business/help/211313200321572) |
+| **Pinterest Ads** | Soporte. **No documenta una vía para clics no válidos** | No indica | No lo dice | Dice que los cargos normales no suelen devolverse. [Fuente](https://help.pinterest.com/en/business/article/refunds-and-chargebacks) |
+| **TikTok Ads, Amazon Ads** | Sin vía encontrada en su ayuda (solo se buscó; sus páginas no se abrieron una a una) | | | |
+
+`n-antibot report --claim-dir reclamacion/` prepara **un expediente por plataforma** con lo que pide cada una:
+
+```console
+$ n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --claim-dir reclamacion/
+n-antibot: Google Ads: 4 clicks (4 within the deadline) -> reclamacion/google-claim.txt
+n-antibot: Meta Ads (Facebook, Instagram): 1 clicks (1 within the deadline) -> reclamacion/meta-claim.txt (the platform documents no process for invalid clicks)
+```
+
+| Archivo | Contenido |
+|---|---|
+| `google-claim.txt` | Dónde reclamar, plazo, lo que pide la plataforma, cuántos clics siguen dentro de plazo, las IP con su motivo y **un texto listo para pegar** que explica por qué son sospechosos |
+| `google-clicks.csv` | Un clic por fila: fecha y hora (UTC), `click_id` (GCLID), IP, navegador, veredicto, motivo, red y ASN, campaña, grupo de anuncios, anuncio y palabra clave (si la dirección los trae) y si está dentro de plazo |
+| `google-log-sample.log` | Las líneas exactas del registro del servidor de esos clics |
+
+Lo que el registro no puede saber y tienes que añadir tú: el ID de tu cuenta y los nombres de campaña, grupo y
+palabra clave de los clics cuya dirección no los lleve. Si añades esos datos a tu plantilla de seguimiento
+(`utm_campaign`, `utm_term`…), el siguiente informe ya los trae.
+
+> [!WARNING]
+> **Cortar al bot no evita el cobro:** el clic ocurre en la plataforma antes de que la visita llegue a tu web. Y
+> ninguna plataforma garantiza la devolución: todas deciden ellas, y varias solo dan crédito publicitario.
+
+## 🔌 API de datos
+
+`n-antibot serve` levanta una API de solo lectura, en JSON, con los mismos datos: para tu panel, una hoja de
+cálculo o una alerta.
+
+```console
+$ export N_ANTIBOT_TOKEN="$(openssl rand -hex 24)"
+$ n-antibot serve '/var/log/nginx/access.log*'
+n-antibot: API on http://127.0.0.1:8787 (token required)
+$ curl -H "Authorization: Bearer $N_ANTIBOT_TOKEN" "http://127.0.0.1:8787/v1/ad-clicks?verdict=bot&platform=google"
+```
+
+| Dirección | Qué devuelve |
+|---|---|
+| `GET /v1/summary` | Peticiones, bots y clics de anuncios por plataforma |
+| `GET /v1/bots` | Bots por red y por robot, y los visitantes con más peticiones sin bloquear |
+| `GET /v1/ad-clicks` | Los clics de anuncios uno a uno, con filtros, paginación y CSV |
+| `GET /v1/claims` | Dónde se reclama en cada plataforma, qué pide y cuántos clics tienes dentro de plazo |
+| `GET /v1/check` | Si una IP o un navegador se bloquearía |
+| `GET /v1/blocklist` | Los rangos y robots en uso |
+| `GET /health`, `GET /v1/openapi.json` | Estado del servicio y especificación OpenAPI 3.1 (sin clave) |
+
+Escucha solo en `127.0.0.1` salvo que le des una clave; la clave va en la cabecera, nunca en la dirección.
+
+Guía completa, con cada parámetro, cada campo, errores, ejemplos y puesta en marcha:
+[docs/es/api.md](docs/es/api.md) · [openapi.json](docs/openapi.json).
 
 ## 🐍 Uso desde Python
 
@@ -715,6 +784,8 @@ N-antibot/
 │   ├── ranges.py       # descarga de RIPEstat, agrupación y resta de rangos
 │   ├── render.py       # salidas: Caddy, nginx, Apache, nftables, Cloudflare y JSON
 │   ├── report.py       # informe desde los registros: bots y clics de anuncios
+│   ├── claims.py       # dónde reclama cada plataforma de anuncios y el expediente por plataforma
+│   ├── api.py          # API de solo lectura (n-antibot serve)
 │   ├── core.py         # generate(): de la configuración al archivo
 │   ├── cli.py          # línea de comandos
 │   └── example.toml    # configuración de ejemplo (n-antibot init)
