@@ -227,8 +227,7 @@ que dice [la documentación de HUMAN](https://docs.humansecurity.com/application
 
 **En una frase:** si lo que te llega son servidores en la nube y raspadores que ni disimulan, N-antibot los para hoy
 y sin pagar. Si te atacan bots que se comportan como personas desde conexiones domésticas, necesitas un servicio
-como PerimeterX; N-antibot no los ve, y lo dice en [sus límites](#-límites-lo-que-n-antibot-no-hace). Los dos
-se pueden usar a la vez.
+como PerimeterX; N-antibot no los ve, y lo dice en [sus límites](#-límites-lo-que-n-antibot-no-hace).
 
 ## 🛡️ Qué bloquea y qué no
 

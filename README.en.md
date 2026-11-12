@@ -228,7 +228,6 @@ the comparison, with what [HUMAN's documentation](https://docs.humansecurity.com
 **In one sentence:** if what reaches you is cloud servers and scrapers that do not even pretend, N-antibot stops them
 today and for free. If you are attacked by bots that behave like people from home connections, you need a service
 like PerimeterX; N-antibot does not see them, and says so in [its limits](#-limits-what-n-antibot-does-not-do).
-Both can be used together.
 
 ## 🛡️ What it blocks and what it does not
 
