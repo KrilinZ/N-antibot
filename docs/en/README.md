@@ -33,6 +33,11 @@ curl -sI https://example.com | grep -i -E '^(server|via|cf-ray|x-vercel-id)'
 | `server: Vercel` or `x-vercel-id` | [Next.js and Vercel](vercel-nextjs.md) |
 | Something else (LiteSpeed, IIS, a PaaS…) | [Node.js](node-express.md) if your app is Node, or the [firewall](nftables.md) if the server is yours |
 
+## Bot and ad-click report
+
+[Bot and ad-click report](ads-report.md): how many visits are bots and how many paid clicks (Google Ads, Microsoft
+Ads…) were made by a bot, with a CSV to claim them. ✅ Tested with real logs from Caddy, nginx and Apache.
+
 ## By use case
 
 [Use cases](cases.md): ready-to-copy configurations, each with its file in

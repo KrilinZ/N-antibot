@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "n-antibot"
-version = "0.3.0"
+version = "0.4.0"
 description = "Block bot networks and scraper user agents at your web server (Caddy, nginx). No accounts, no keys, no dependencies."
 readme = "README.md"
 license = "MIT"

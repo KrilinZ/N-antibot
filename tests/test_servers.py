@@ -81,7 +81,7 @@ def caddy(tmp_path):
         (d / "n-antibot.caddy").write_text(generate(cfg("caddy", block_loopback), fetch=no_fetch))
         (d / "Caddyfile").write_text(
             "{\n\tauto_https off\n\tadmin off\n}\n"
-            f":{port} {{\n\timport {d}/n-antibot.caddy\n"
+            f":{port} {{\n\timport {d}/n-antibot.caddy\n\tlog {{\n\t\toutput file {d}/access.log\n\t}}\n"
             '\thandle /api/* {\n\t\trespond "api" 200\n\t}\n'
             '\thandle /producto/* {\n\t\trespond "producto" 200\n\t}\n'
             '\thandle {\n\t\trespond "ok" 200\n\t}\n}\n'
@@ -115,7 +115,7 @@ def nginx(tmp_path):
         (d / "n-antibot.conf").write_text(generate(cfg("nginx", block_loopback), fetch=no_fetch))
         (d / "nginx.conf").write_text(
             f"daemon off;\nworker_processes 1;\nerror_log {d}/error.log;\npid {d}/nginx.pid;\nevents {{}}\n"
-            f"http {{\n\taccess_log off;\n\tinclude {d}/n-antibot.conf;\n"
+            f"http {{\n\taccess_log {d}/access.log combined;\n\tinclude {d}/n-antibot.conf;\n"
             f"\tserver {{\n\t\tlisten 127.0.0.1:{port};\n\t\tif ($n_antibot_block) {{ return 444; }}\n"
             '\t\tlocation / { return 200 "ok"; }\n\t}\n}\n'
         )
@@ -187,13 +187,14 @@ def apache(tmp_path):
             (d / "www/.htaccess").write_text(rules)
         load = "".join(
             f"LoadModule {m}_module {modules}/mod_{m}.so\n"
-            for m in ("mpm_prefork", "unixd", "authz_core", "dir", "rewrite")
+            for m in ("mpm_prefork", "unixd", "authz_core", "dir", "rewrite", "log_config")
             if (modules / f"mod_{m}.so").exists()
         )
         (d / "httpd.conf").write_text(
             f'ServerRoot "{d}"\nDefaultRuntimeDir "{d}"\nMutex file:{d} default\nPidFile "{d}/httpd.pid"\n'
             f'Listen 127.0.0.1:{port}\nServerName localhost\n{load}ErrorLog "{d}/error.log"\n'
             f'DocumentRoot "{d}/www"\nDirectoryIndex index.html\n'
+            f'CustomLog "{d}/access.log" "%h %l %u %t \\"%r\\" %>s %b \\"%{{Referer}}i\\" \\"%{{User-Agent}}i\\""\n'
             f'<Directory "{d}/www">\n\tRequire all granted\n\tAllowOverride All\n</Directory>\n'
             + ("" if htaccess else f"<VirtualHost 127.0.0.1:{port}>\n\tInclude {d}/n-antibot.conf\n</VirtualHost>\n")
         )
@@ -288,3 +289,33 @@ def test_nftables_drops_the_blocked_network(tmp_path):
         subprocess.run(["sudo", "-n", "nft", "delete", "table", "inet", table], capture_output=True)
         server.terminate()
         server.wait(10)
+
+
+# ---------------------------------------------------------------- report from the logs each server really writes
+@pytest.mark.parametrize("server", ["caddy", "nginx", "apache"])
+def test_report_reads_real_access_logs(server, request, tmp_path):
+    from n_antibot import report
+
+    port = request.getfixturevalue(server)(False)
+    get(port, "/?gclid=BOT-1", BYTESPIDER)
+    get(port, "/producto/?gclid=BOT-2&utm_medium=cpc", "python-requests/2.32.3")
+    get(port, "/?gclid=HUMAN-1", CHROME)
+    get(port, "/?msclkid=MS-1", CHROME)
+    get(port, "/", GOOGLE)
+    log = tmp_path / f"{server}{port}" / "access.log"
+    for _ in range(50):  # servers flush their log a moment after answering
+        if log.exists() and log.read_text().count("\n") >= 5:
+            break
+        time.sleep(0.1)
+
+    config = cfg(server, False)
+    classifier = report.Classifier.from_config(config, fetch_asn=lambda asn: [])
+    rep = report.analyze(log.read_text().splitlines(), classifier)
+    assert rep.requests == 5 and rep.lines == rep.parsed
+    assert rep.bot_requests == 2 and rep.bot_cut == 2 and rep.bot_served == 0
+    google = rep.clicks_by("google")
+    assert google["total"] == 3 and google["agent"] == 2
+    assert rep.clicks_by("microsoft")["total"] == 1
+    bots = {c.click_id: c for c in rep.clicks if c.reason == "agent"}
+    assert set(bots) == {"BOT-1", "BOT-2"} and all(c.cut for c in bots.values())
+    assert bots["BOT-1"].first.ip == "127.0.0.1" and bots["BOT-1"].first.ts is not None

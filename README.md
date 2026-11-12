@@ -33,6 +33,9 @@ Linux**, **Cloudflare** o tu aplicación **Node.js** que corta, sin llegar a tu 
 
 Google, Bing, los robots de IA, tus clientes y `curl` siguen entrando con normalidad.
 
+Además, **lee tus registros y cuenta cuántos clics de anuncios los hizo un bot**, con un CSV listo para
+[reclamárselos a Google](docs/es/informe-anuncios.md).
+
 ```console
 $ pip install git+https://github.com/KrilinZ/N-antibot.git
 $ n-antibot generate -o n-antibot.caddy
@@ -60,6 +63,7 @@ n-antibot: installed: example.com is protected
 - [Configuración](#-configuración)
 - [Listas incluidas](#-listas-incluidas)
 - [Comandos](#️-comandos)
+- [Informe: bots y clics de anuncios](#-informe-bots-y-clics-de-anuncios)
 - [Uso desde Python](#-uso-desde-python)
 - [Mantener las listas al día](#-mantener-las-listas-al-día)
 - [Comprobar que funciona](#-comprobar-que-funciona)
@@ -231,7 +235,7 @@ O aislado, con [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.3.0`.
+Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.4.0`.
 
 ### 🟦 Instalación en Caddy
 
@@ -373,7 +377,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.3.0",
+  "generator": "n-antibot 0.4.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -485,6 +489,7 @@ Míralas en cualquier momento con `n-antibot presets`.
 |---|---|---|
 | `n-antibot generate [-c CFG] [-f FORMATO] [-o ARCHIVO]` | Descarga rangos y escribe el archivo (o lo imprime). | `0` bien |
 | `n-antibot check [-c CFG] [-f FORMATO] -o ARCHIVO` | Dice si el archivo está al día. | `0` al día · `1` desactualizado |
+| `n-antibot report [-c CFG] REGISTRO… [--csv ARCHIVO]` | Lee registros de acceso: bots y clics de anuncios hechos por bots. [Guía](docs/es/informe-anuncios.md). | `0` |
 | `n-antibot test-agent [-c CFG] "USER-AGENT"` | ¿Se cortaría este `User-Agent`? No usa la red. | `0` cortado · `2` pasa |
 | `n-antibot test-ip [-c CFG] IP` | ¿Se cortaría esta IP? | `0` cortada · `2` pasa |
 | `n-antibot presets` | Lista las redes y robots incluidos. | `0` |
@@ -509,6 +514,33 @@ allowed
 $ n-antibot check -o /etc/caddy/n-antibot.caddy
 /etc/caddy/n-antibot.caddy: up to date
 ```
+
+## 📊 Informe: bots y clics de anuncios
+
+`n-antibot report` lee los registros de acceso de tu servidor (Caddy, nginx o Apache) y te dice cuántas visitas son
+de bots y **cuántos clics de anuncios de pago los hizo un bot**, con un CSV (fecha, IP, navegador y `gclid`) que es
+justo lo que pide Google para investigar clics no válidos y abonarlos.
+
+```console
+$ n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --csv clics-bots.csv
+Bots
+  Requests from bots: 3 (50.0%) from 2 IPs
+    cut off:  2
+    served:   1   <- N-antibot is not stopping these yet
+Paid ad clicks
+  google: 4 clicks
+    bots:        3 (75.0%)  [network 2, robot 1]
+    suspicious:  0 (0.0%)  [repeated IP 0, no resources 0]
+    clean:       1
+  ...
+n-antibot: 4 ad clicks written to clics-bots.csv
+```
+
+> [!WARNING]
+> Cortar al bot no evita el cobro: el clic se produce en Google antes de llegar a tu web. El dinero se recupera
+> reclamando, y para eso es el CSV.
+
+Guía completa, con qué pide Google y cómo reclamar: [docs/es/informe-anuncios.md](docs/es/informe-anuncios.md).
 
 ## 🐍 Uso desde Python
 
@@ -682,6 +714,7 @@ N-antibot/
 │   ├── config.py       # configuración TOML y sus validaciones
 │   ├── ranges.py       # descarga de RIPEstat, agrupación y resta de rangos
 │   ├── render.py       # salidas: Caddy, nginx, Apache, nftables, Cloudflare y JSON
+│   ├── report.py       # informe desde los registros: bots y clics de anuncios
 │   ├── core.py         # generate(): de la configuración al archivo
 │   ├── cli.py          # línea de comandos
 │   └── example.toml    # configuración de ejemplo (n-antibot init)

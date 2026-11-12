@@ -1,16 +1,18 @@
-"""Command line: n-antibot generate | check | test-agent | test-ip | presets | init."""
+"""Command line: n-antibot generate | check | report | test-agent | test-ip | presets | init."""
 
 from __future__ import annotations
 
 import argparse
 import ipaddress
+import json
 import os
 import sys
 import tempfile
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import __version__
+from . import __version__, report
 from .config import FORMATS, Config, ConfigError, load
 from .core import blocklist
 from .presets import NETWORK_PRESETS, ROBOT_PRESETS
@@ -83,6 +85,36 @@ def cmd_test_ip(a: argparse.Namespace) -> int:
     return 0 if hit else 2
 
 
+def _day(text: str) -> datetime:
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise ValueError(f"{text!r} is not a date like 2026-11-12") from None
+
+
+def cmd_report(a: argparse.Namespace) -> int:
+    cfg = _config(a)
+    classifier = report.Classifier.from_config(cfg)
+    rep = report.analyze(
+        report.read_logs(a.logs),
+        classifier,
+        since=_day(a.since) if a.since else None,
+        until=_day(a.until) + timedelta(days=1) if a.until else None,
+        min_repeat=a.min_repeat,
+    )
+    if a.json:
+        print(json.dumps(report.as_dict(rep), indent=2))
+    else:
+        sys.stdout.write(report.render_text(rep))
+    if a.csv:
+        path = Path(a.csv)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            rows = report.write_csv(rep, f, include_clean=a.all_clicks)
+        print(f"n-antibot: {rows} ad clicks written to {path}", file=sys.stderr)
+    return 0
+
+
 def cmd_presets(_: argparse.Namespace) -> int:
     for title, presets in (
         ("Networks ([networks] presets)", NETWORK_PRESETS),
@@ -143,6 +175,21 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("ip")
     p.set_defaults(func=cmd_test_ip)
 
+    p = sub.add_parser("report", help="read access logs: bots, and paid ad clicks made by bots")
+    common(p, fmt=False)
+    p.add_argument(
+        "logs", nargs="+", help="access logs: Caddy JSON, nginx or Apache combined; .gz allowed; - for stdin"
+    )
+    p.add_argument("--since", metavar="YYYY-MM-DD", help="first day to include (UTC)")
+    p.add_argument("--until", metavar="YYYY-MM-DD", help="last day to include (UTC)")
+    p.add_argument("--csv", metavar="FILE", help="write the bot and suspicious ad clicks to a CSV file")
+    p.add_argument("--all-clicks", action="store_true", help="with --csv: include the clean clicks too")
+    p.add_argument("--json", action="store_true", help="print the summary as JSON")
+    p.add_argument(
+        "--min-repeat", type=int, default=3, metavar="N", help="ad clicks from one IP to call it repeated (3)"
+    )
+    p.set_defaults(func=cmd_report)
+
     p = sub.add_parser("presets", help="list built-in network and robot presets")
     p.set_defaults(func=cmd_presets)
 
@@ -164,4 +211,7 @@ def main(argv: list[str] | None = None) -> int:
         return 4
     except ValueError as e:
         print(f"n-antibot: {e}", file=sys.stderr)
+        return 3
+    except OSError as e:
+        print(f"n-antibot: {e.filename or ''}: {e.strerror or e}", file=sys.stderr)
         return 3

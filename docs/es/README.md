@@ -33,6 +33,12 @@ curl -sI https://example.com | grep -i -E '^(server|via|cf-ray|x-vercel-id)'
 | `server: Vercel` o `x-vercel-id` | [Next.js y Vercel](vercel-nextjs.md) |
 | Otra cosa (LiteSpeed, IIS, un PaaS…) | [Node.js](node-express.md) si tu app es Node, o el [cortafuegos](nftables.md) si el servidor es tuyo |
 
+## Informe de bots y de clics de anuncios
+
+[Informe de bots y de clics de anuncios](informe-anuncios.md): cuántas visitas son de bots y cuántos clics de pago
+(Google Ads, Microsoft Ads…) los hizo un bot, con un CSV para reclamarlos. ✅ Probado con registros reales de Caddy,
+nginx y Apache.
+
 ## Por caso de uso
 
 [Casos de uso](casos.md): configuraciones listas para copiar, cada una con su archivo en

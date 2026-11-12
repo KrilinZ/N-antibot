@@ -33,6 +33,9 @@ N-antibot generates a small configuration file for **Caddy**, **nginx**, **Apach
 
 Google, Bing, AI crawlers, your customers and `curl` keep getting in as usual.
 
+It also **reads your logs and counts how many ad clicks were made by a bot**, with a CSV ready to
+[claim them from Google](docs/en/ads-report.md).
+
 ```console
 $ pip install git+https://github.com/KrilinZ/N-antibot.git
 $ n-antibot generate -o n-antibot.caddy
@@ -60,6 +63,7 @@ n-antibot: installed: example.com is protected
 - [Configuration](#-configuration)
 - [Built-in lists](#-built-in-lists)
 - [Commands](#️-commands)
+- [Report: bots and ad clicks](#-report-bots-and-ad-clicks)
 - [Python API](#-python-api)
 - [Keeping the lists fresh](#-keeping-the-lists-fresh)
 - [Checking that it works](#-checking-that-it-works)
@@ -231,7 +235,7 @@ Or isolated, with [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-To pin a version, append the tag: `...N-antibot.git@v0.3.0`.
+To pin a version, append the tag: `...N-antibot.git@v0.4.0`.
 
 ### 🟦 Caddy setup
 
@@ -373,7 +377,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.3.0",
+  "generator": "n-antibot 0.4.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -485,6 +489,7 @@ See them at any time with `n-antibot presets`.
 |---|---|---|
 | `n-antibot generate [-c CFG] [-f FORMAT] [-o FILE]` | Downloads ranges and writes the file (or prints it). | `0` ok |
 | `n-antibot check [-c CFG] [-f FORMAT] -o FILE` | Says whether the file is up to date. | `0` up to date · `1` out of date |
+| `n-antibot report [-c CFG] LOG… [--csv FILE]` | Reads access logs: bots and ad clicks made by bots. [Guide](docs/en/ads-report.md). | `0` |
 | `n-antibot test-agent [-c CFG] "USER-AGENT"` | Would this `User-Agent` be cut off? Uses no network. | `0` blocked · `2` allowed |
 | `n-antibot test-ip [-c CFG] IP` | Would this IP be cut off? | `0` blocked · `2` allowed |
 | `n-antibot presets` | Lists the built-in networks and robots. | `0` |
@@ -509,6 +514,33 @@ allowed
 $ n-antibot check -o /etc/caddy/n-antibot.caddy
 /etc/caddy/n-antibot.caddy: up to date
 ```
+
+## 📊 Report: bots and ad clicks
+
+`n-antibot report` reads your server's access logs (Caddy, nginx or Apache) and tells you how many visits are bots
+and **how many paid ad clicks were made by a bot**, with a CSV (date, IP, browser and `gclid`) that is exactly what
+Google asks for to investigate invalid clicks and credit them.
+
+```console
+$ n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --csv bot-clicks.csv
+Bots
+  Requests from bots: 3 (50.0%) from 2 IPs
+    cut off:  2
+    served:   1   <- N-antibot is not stopping these yet
+Paid ad clicks
+  google: 4 clicks
+    bots:        3 (75.0%)  [network 2, robot 1]
+    suspicious:  0 (0.0%)  [repeated IP 0, no resources 0]
+    clean:       1
+  ...
+n-antibot: 4 ad clicks written to bot-clicks.csv
+```
+
+> [!WARNING]
+> Cutting the bot off does not avoid the charge: the click happens at Google before reaching your site. The money
+> is recovered by claiming, and that is what the CSV is for.
+
+Full guide, with what Google asks for and how to claim: [docs/en/ads-report.md](docs/en/ads-report.md).
 
 ## 🐍 Python API
 
@@ -682,6 +714,7 @@ N-antibot/
 │   ├── config.py       # TOML configuration and its validations
 │   ├── ranges.py       # RIPEstat download, merging and subtracting ranges
 │   ├── render.py       # outputs: Caddy, nginx, Apache, nftables, Cloudflare and JSON
+│   ├── report.py       # report from the logs: bots and ad clicks
 │   ├── core.py         # generate(): from configuration to file
 │   ├── cli.py          # command line
 │   └── example.toml    # example configuration (n-antibot init)
