@@ -8,11 +8,16 @@ permissions:
 jobs:
   # Every supported Python, with real Caddy, nginx, Apache and nftables.
   python:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+        os: [ubuntu-latest]
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        include:
+          # Python 3.9 is no longer offered for the newest runner image.
+          - os: ubuntu-22.04
+            python: '3.9'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
