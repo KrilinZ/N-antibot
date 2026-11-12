@@ -1,0 +1,13 @@
+# Example: a site protected by N-antibot.
+example.com {
+	# Must be the FIRST line of the site block.
+	import /etc/caddy/n-antibot.caddy
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle {
+		root * /var/www/example
+		file_server
+	}
+}

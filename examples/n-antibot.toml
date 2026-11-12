@@ -1,0 +1,40 @@
+# n-antibot configuration. Every key is optional: delete what you do not need.
+# Reference: https://github.com/KrilinZ/N-antibot#configuration
+
+[networks]
+# Cloud networks to block, by preset (run `n-antibot presets`).
+presets = ["tencent-cloud"]
+# Extra autonomous systems, e.g. ["AS45102"].
+asns = []
+# Extra ranges you want blocked.
+block = []
+# Ranges that are NEVER blocked, even inside a blocked network (your own servers, uptime monitors, partners).
+allow = []
+
+[robots]
+# User-agent families to block (run `n-antibot presets`).
+presets = ["aggressive-crawlers", "scraping-libraries", "vulnerability-scanners"]
+# Extra fragments, matched case-insensitively anywhere in the User-Agent. Letters, digits, "_" and "-" only.
+block = []
+# Fragments to take out of the presets, e.g. ["aiohttp"] if one of your partners uses it.
+allow = []
+
+[paths]
+# Paths that are never blocked: certificates, webhooks, APIs called by servers, health checks.
+# Forms: "/exact", "/prefix/*" or "*.ext".
+exclude = ["/.well-known/*"]
+
+[output]
+# caddy | nginx | json
+format = "caddy"
+
+[caddy]
+# Names used inside the snippet. Change them only if you import two snippets in the same site.
+prefix = "nAntibot"
+block_path = "/__n_antibot_blocked"
+# "remote_ip" (direct connection) or "client_ip" (behind Cloudflare or a load balancer with trusted_proxies set).
+ip_matcher = "remote_ip"
+
+[nginx]
+# Prefix of the variables ($n_antibot_block, $n_antibot_net, ...).
+prefix = "n_antibot"
