@@ -1,5 +1,5 @@
 # n-antibot configuration. Every key is optional: delete what you do not need.
-# Reference: https://github.com/KrilinZ/N-antibot#configuration
+# Reference: https://github.com/KrilinZ/N-antibot/blob/main/README.en.md#-configuration
 
 [networks]
 # Cloud networks to block, by preset (run `n-antibot presets`).
