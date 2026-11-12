@@ -1,0 +1,7 @@
+# Caddy behind Cloudflare or a load balancer: match the visitor's IP, not the proxy's.
+# Caddy must have `trusted_proxies` configured in its global options.
+[paths]
+exclude = ["/.well-known/*", "/api/*"]
+
+[caddy]
+ip_matcher = "client_ip"

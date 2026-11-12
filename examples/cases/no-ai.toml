@@ -1,0 +1,5 @@
+# Keep AI crawlers out. Your site will stop appearing in AI answers (ChatGPT, Claude...).
+[robots]
+presets = ["aggressive-crawlers", "scraping-libraries", "vulnerability-scanners", "ai-training"]
+# PerplexityBot is not in the preset: add any other crawler by name.
+block = ["PerplexityBot"]

@@ -1,0 +1,12 @@
+# Maximum protection: three cloud networks and SEO tools on top of the defaults.
+# Check your access logs first: you may have real customers or partners in those networks.
+[networks]
+presets = ["tencent-cloud", "alibaba-cloud", "huawei-cloud"]
+# Your own servers and monitors, even if they live in a blocked network.
+allow = ["203.0.113.10/32"]
+
+[robots]
+presets = ["aggressive-crawlers", "scraping-libraries", "vulnerability-scanners", "seo-tools"]
+
+[paths]
+exclude = ["/.well-known/*", "/api/*"]

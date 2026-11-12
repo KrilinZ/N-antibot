@@ -17,8 +17,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       # Real servers, so the end-to-end tests run instead of being skipped.
-      - run: sudo apt-get update && sudo apt-get install -y nginx caddy
+      - run: sudo apt-get update && sudo apt-get install -y nginx caddy apache2 nftables
       - run: pip install -e . pytest ruff
       - run: ruff check src tests
       - run: ruff format --check src tests
       - run: pytest -q -rs
+      - run: node --test tests/node/

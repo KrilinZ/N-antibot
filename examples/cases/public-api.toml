@@ -1,0 +1,6 @@
+# Site with a public API: other people's programs are your customers, so HTTP libraries stay allowed.
+[robots]
+presets = ["aggressive-crawlers", "vulnerability-scanners"]
+
+[paths]
+exclude = ["/.well-known/*", "/health"]

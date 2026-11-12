@@ -1,0 +1,12 @@
+# Linux firewall (nftables): drops the networks before they reach any web server or container.
+# Networks only: a firewall cannot see the User-Agent or the path.
+[networks]
+presets = ["tencent-cloud"]
+allow = []
+
+[output]
+format = "nftables"
+
+[nftables]
+table = "n_antibot"
+ports = [80, 443]

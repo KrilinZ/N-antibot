@@ -1,0 +1,10 @@
+# Blog, magazine or corporate site: keep feeds and sitemaps open for readers and aggregators.
+[paths]
+exclude = [
+  "/.well-known/*",
+  "/feed",
+  "/feed/*",
+  "/rss.xml",
+  "/atom.xml",
+  "/robots.txt",
+]

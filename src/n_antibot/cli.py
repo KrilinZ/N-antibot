@@ -113,7 +113,7 @@ def cmd_init(a: argparse.Namespace) -> int:
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="n-antibot",
-        description="Block bot networks and scraper user agents at your web server (Caddy, nginx).",
+        description="Block bot networks and scrapers: Caddy, nginx, Apache, nftables, Cloudflare or JSON.",
     )
     ap.add_argument("--version", action="version", version=f"n-antibot {__version__}")
     sub = ap.add_subparsers(dest="cmd", required=True)

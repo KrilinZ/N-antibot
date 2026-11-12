@@ -25,7 +25,7 @@ allow = []
 exclude = ["/.well-known/*"]
 
 [output]
-# caddy | nginx | json
+# caddy | nginx | apache | nftables | cloudflare | json
 format = "caddy"
 
 [caddy]
@@ -38,3 +38,8 @@ ip_matcher = "remote_ip"
 [nginx]
 # Prefix of the variables ($n_antibot_block, $n_antibot_net, ...).
 prefix = "n_antibot"
+
+[nftables]
+# Name of the table and the ports it protects (TCP and UDP).
+table = "n_antibot"
+ports = [80, 443]

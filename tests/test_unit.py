@@ -107,7 +107,7 @@ def test_defaults_are_valid_and_cover_the_original_brake():
         ({"networks": {"block": ["300.1.1.1/8"]}}, "not an IP range"),
         ({"paths": {"exclude": ["api/*"]}}, "paths.exclude"),
         ({"paths": {"exclude": ["/a/*/b"]}}, "paths.exclude"),
-        ({"output": {"format": "apache"}}, "output.format"),
+        ({"output": {"format": "iis"}}, "output.format"),
         ({"caddy": {"prefix": "bad-name"}}, "caddy.prefix"),
         ({"caddy": {"ip_matcher": "x"}}, "ip_matcher"),
         ({"networks": {"presets": []}, "robots": {"presets": []}}, "nothing to block"),
@@ -247,3 +247,92 @@ def _bl(cfg):
     from n_antibot.core import blocklist
 
     return blocklist(cfg, fetch=fake_fetch, today="2026-11-12")
+
+
+# ---------------------------------------------------------------- apache, nftables, cloudflare
+def test_apache_rules_shape():
+    text = gen(output={"format": "apache"}, paths={"exclude": ["/api/*", "/health", "*.xml"]})
+    lines = text.splitlines()
+    assert lines[3] == "RewriteEngine On"
+    assert 'RewriteCond %{REQUEST_URI} "!^/api/"' in text
+    assert 'RewriteCond %{REQUEST_URI} "!^/health$"' in text
+    assert 'RewriteCond %{REQUEST_URI} "!\\.xml$"' in text
+    assert '"(Bytespider|' in text and "[NC,OR]" in text
+    assert "-R '43.172.0.0/23' || -R '43.173.0.0/16' || -R '2402:4e00::/32'\"" in text
+    conds = [x for x in lines if x.startswith("RewriteCond") and "REQUEST_URI" not in x]
+    assert all(c.endswith("OR]") for c in conds[:-1]) and not conds[-1].endswith("]")
+    assert lines[-1] == "RewriteRule ^ - [F,L]"
+
+
+def test_apache_agents_only_and_networks_only():
+    agents = gen(output={"format": "apache"}, networks={"presets": []})
+    assert agents.splitlines()[-2].endswith('" [NC]') and "expr" not in agents
+    nets = gen(output={"format": "apache"}, robots={"presets": []})
+    assert "HTTP_USER_AGENT" not in nets and "OR]" not in nets
+
+
+def test_nftables_ruleset_shape():
+    text = gen(output={"format": "nftables"}, nftables={"ports": [80, 443, 8443]})
+    assert "add table inet n_antibot\ndelete table inet n_antibot\ntable inet n_antibot {" in text
+    assert "type ipv4_addr" in text and "type ipv6_addr" in text and "flags interval" in text
+    assert "43.172.0.0/23, 43.173.0.0/16," in text
+    assert "tcp dport { 80, 443, 8443 } ip saddr @v4 drop" in text
+    assert "udp dport { 80, 443, 8443 } ip6 saddr @v6 drop" in text
+    assert "hook prerouting" in text and "robots" in text.splitlines()[2] and " 0 robots" in text
+    assert text.count("{") == text.count("}")
+
+
+def test_nftables_without_ipv6_and_without_networks():
+    text = gen(output={"format": "nftables"}, networks={"presets": [], "block": ["203.0.113.0/24"]})
+    assert "set v6" not in text and "@v6" not in text and "203.0.113.0/24," in text
+    with pytest.raises(ConfigError, match="only blocks networks"):
+        from_dict({"output": {"format": "nftables"}, "networks": {"presets": []}})
+    with pytest.raises(ConfigError, match=r"nftables\.ports"):
+        from_dict({"nftables": {"ports": [0]}})
+    with pytest.raises(ConfigError, match="list of integers"):
+        from_dict({"nftables": {"ports": ["80"]}})
+
+
+def test_cloudflare_expression():
+    calls = []
+
+    def spy(asns, **_):
+        calls.append(asns)
+        return []
+
+    cfg = from_dict(
+        {
+            "output": {"format": "cloudflare"},
+            "networks": {"block": ["203.0.113.0/24"], "allow": ["43.173.5.5/32"]},
+            "paths": {"exclude": ["/api/*", "/health", "*.xml"]},
+        }
+    )
+    expr = generate(cfg, fetch=spy, today="2026-11-12").rstrip("\n").splitlines()[-1]
+    assert calls == []  # matched by ASN: nothing is downloaded
+    assert expr.startswith("(ip.src.asnum in {132203 45090} or ip.src in {203.0.113.0/24} or ")
+    assert 'lower(http.user_agent) contains "bytespider"' in expr
+    assert ") and not ip.src in {43.173.5.5/32}" in expr
+    assert 'and not starts_with(http.request.uri.path, "/api/")' in expr
+    assert 'and not http.request.uri.path eq "/health"' in expr
+    assert 'and not ends_with(http.request.uri.path, ".xml")' in expr
+    assert expr.count("(") == expr.count(")")
+
+
+def test_cloudflare_default_fits_the_expression_limit():
+    expr = gen(output={"format": "cloudflare"}).rstrip("\n").splitlines()[-1]
+    assert len(expr) < 4096
+
+
+def test_every_example_case_is_a_valid_configuration():
+    from pathlib import Path
+
+    from n_antibot import load
+
+    cases = sorted((Path(__file__).parent.parent / "examples" / "cases").glob("*.toml"))
+    assert len(cases) >= 8
+    for case in cases:
+        cfg = load(case)
+        assert generate(cfg, fetch=fake_fetch, today="2026-11-12"), case.name
+    assert load(cases[0].parent / "wordpress.toml").format == "apache"
+    assert load(cases[0].parent / "no-ai.toml").blocks_agent("PerplexityBot/1.0") == "PerplexityBot"
+    assert load(cases[0].parent / "public-api.toml").blocks_agent("python-requests/2.32") is None

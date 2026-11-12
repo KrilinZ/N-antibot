@@ -1,0 +1,8 @@
+# Online shop: block data-center bots and scrapers, never the payment provider or your own integrations.
+[paths]
+exclude = [
+  "/.well-known/*",  # certificates
+  "/api/*",          # your API: payment webhooks, back office, mobile app
+  "/webhooks/*",     # other providers calling you
+  "/health",         # uptime monitor
+]

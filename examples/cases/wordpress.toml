@@ -1,0 +1,14 @@
+# WordPress on Apache (also valid for shared hosting through .htaccess).
+[paths]
+exclude = [
+  "/.well-known/*",
+  "/wp-json/*",                # REST API: apps, Jetpack, payment plugins
+  "/wp-cron.php",              # scheduled tasks triggered from outside
+  "/wp-admin/admin-ajax.php",  # plugins calling back
+  "/xmlrpc.php",               # remove this line if you do not use XML-RPC
+  "/feed",
+  "/feed/*",
+]
+
+[output]
+format = "apache"

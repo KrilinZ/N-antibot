@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from . import __version__
 from .config import Config
@@ -19,6 +19,8 @@ class Blocklist:
     agents: tuple[str, ...]
     asns: tuple[str, ...]
     generated_on: str
+    manual_block: tuple[str, ...] = ()
+    manual_allow: tuple[str, ...] = ()
 
 
 def _header(c: str, bl: Blocklist, where: str) -> list[str]:
@@ -95,6 +97,109 @@ def nginx(bl: Blocklist, cfg: Config) -> str:
     return "\n".join(lines)
 
 
+def _regex_path(p: str) -> str:
+    """Anchored regular expression for one excluded path ('/exact', '/prefix/*' or '*.ext')."""
+    if p.startswith("*."):
+        return f"\\.{re.escape(p[2:])}$"
+    if p.endswith("*"):
+        return "^" + re.escape(p[:-1])
+    return "^" + re.escape(p) + "$"
+
+
+def apache(bl: Blocklist, cfg: Config) -> str:
+    """mod_rewrite rules for Apache 2.4: a <VirtualHost>, the server config or the top of an .htaccess.
+
+    Apache cannot drop a connection from configuration, so the answer is 403 Forbidden. Conditions are ANDed unless
+    flagged [OR], and [OR] binds tighter: (not excluded path) AND (robot OR network OR network...).
+    """
+    lines = _header(
+        "#",
+        bl,
+        "Include it in your <VirtualHost> (Include /etc/apache2/n-antibot.conf) or paste it at the top of .htaccess",
+    )
+    lines.append("RewriteEngine On")
+    lines += [f'RewriteCond %{{REQUEST_URI}} "!{_regex_path(x)}"' for x in cfg.exclude_paths]
+    ors: list[str] = []
+    if bl.agents:
+        ors.append(f'RewriteCond %{{HTTP_USER_AGENT}} "{_alt(bl.agents)}" [NC')
+    ranges = bl.v4 + bl.v6
+    for i in range(0, len(ranges), 8):
+        ors.append('RewriteCond expr "' + " || ".join(f"-R '{r}'" for r in ranges[i : i + 8]) + '" [')
+    for i, cond in enumerate(ors):
+        last = i == len(ors) - 1
+        if cond.endswith("[NC"):
+            lines.append(cond + ("]" if last else ",OR]"))
+        else:
+            lines.append(cond[:-2] if last else cond + "OR]")
+    lines += ["RewriteRule ^ - [F,L]", ""]
+    return "\n".join(lines)
+
+
+def nftables(bl: Blocklist, cfg: Config) -> str:
+    """Ruleset for `nft -f`: drops packets from the blocked networks before they reach any web server.
+
+    Networks only: a firewall does not see the User-Agent or the path, so robots and excluded paths do not apply.
+    The prerouting hook also covers ports published by Docker. Loading the file again replaces the table atomically.
+    """
+    t = cfg.nftables_table
+    ports = ", ".join(str(p) for p in cfg.nftables_ports)
+    lines = _header(
+        "#",
+        replace(bl, agents=()),
+        f"Load it with: nft -f /etc/nftables.d/n-antibot.nft · remove it with: nft delete table inet {t}",
+    )
+    lines += [f"add table inet {t}", f"delete table inet {t}", f"table inet {t} {{"]
+    rules: list[str] = []
+    for name, kind, family, items in (("v4", "ipv4_addr", "ip", bl.v4), ("v6", "ipv6_addr", "ip6", bl.v6)):
+        if not items:
+            continue
+        lines += [f"\tset {name} {{", f"\t\ttype {kind}", "\t\tflags interval", "\t\telements = {"]
+        lines += [f"\t\t\t{', '.join(items[i : i + 6])}," for i in range(0, len(items), 6)]
+        lines += ["\t\t}", "\t}"]
+        rules.append(f"\t\ttcp dport {{ {ports} }} {family} saddr @{name} drop")
+        rules.append(f"\t\tudp dport {{ {ports} }} {family} saddr @{name} drop")
+    lines += [
+        "\tchain prerouting {",
+        "\t\ttype filter hook prerouting priority -150; policy accept;",
+        *rules,
+        "\t}",
+        "}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _cf_path(p: str) -> str:
+    field = "http.request.uri.path"
+    if p.startswith("*."):
+        return f'ends_with({field}, "{p[1:]}")'
+    if p.endswith("*"):
+        return f'starts_with({field}, "{p[:-1]}")'
+    return f'{field} eq "{p}"'
+
+
+def cloudflare(bl: Blocklist, cfg: Config) -> str:
+    """Expression for a Cloudflare WAF custom rule (action: Block). The expression is the last line.
+
+    Cloudflare knows the ASN of every visitor, so networks are matched by ASN instead of by expanded ranges.
+    """
+    block: list[str] = []
+    if bl.asns:
+        block.append("ip.src.asnum in {" + " ".join(a[2:] for a in bl.asns) + "}")
+    if bl.manual_block:
+        block.append("ip.src in {" + " ".join(bl.manual_block) + "}")
+    block += [f'lower(http.user_agent) contains "{a.lower()}"' for a in bl.agents]
+    expr = "(" + " or ".join(block) + ")"
+    if bl.manual_allow:
+        expr += " and not ip.src in {" + " ".join(bl.manual_allow) + "}"
+    for p in cfg.exclude_paths:
+        expr += f" and not {_cf_path(p)}"
+    lines = _header(
+        "#", bl, "Cloudflare > Security > WAF > Custom rules > Edit expression: paste the LAST line, action Block"
+    )
+    return "\n".join([*lines, "", expr, ""])
+
+
 def as_json(bl: Blocklist, cfg: Config) -> str:
     """Plain data, for a WAF, a CDN rule, fail2ban or your own middleware."""
     return (
@@ -119,7 +224,14 @@ def _alt(agents: tuple[str, ...]) -> str:
     return "(" + "|".join(agents) + ")"
 
 
-RENDERERS = {"caddy": caddy, "nginx": nginx, "json": as_json}
+RENDERERS = {
+    "caddy": caddy,
+    "nginx": nginx,
+    "apache": apache,
+    "nftables": nftables,
+    "cloudflare": cloudflare,
+    "json": as_json,
+}
 
 
 def render(bl: Blocklist, cfg: Config) -> str:

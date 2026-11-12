@@ -11,7 +11,7 @@ from typing import Any
 
 from .presets import NETWORK_PRESETS, PROTECTED_AGENTS, ROBOT_PRESETS, default_names
 
-FORMATS = ("caddy", "nginx", "json")
+FORMATS = ("caddy", "nginx", "apache", "nftables", "cloudflare", "json")
 ASN_RE = re.compile(r"^AS\d{1,10}$")
 # Letters, digits, "_" and "-" only: safe inside an RE2 (Caddy) and a PCRE (nginx) regex without escaping.
 AGENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$")
@@ -39,6 +39,8 @@ class Config:
     caddy_block_path: str = "/__n_antibot_blocked"
     caddy_ip_matcher: str = "remote_ip"
     nginx_prefix: str = "n_antibot"
+    nftables_table: str = "n_antibot"
+    nftables_ports: tuple[int, ...] = (80, 443)
 
     # ---- derived lists -------------------------------------------------------------------------------------------
     def all_asns(self) -> tuple[str, ...]:
@@ -93,6 +95,12 @@ class Config:
             raise ConfigError(f"caddy.prefix: {self.caddy_prefix!r} must be letters, digits or '_'")
         if not IDENT_RE.match(self.nginx_prefix):
             raise ConfigError(f"nginx.prefix: {self.nginx_prefix!r} must be letters, digits or '_'")
+        if not IDENT_RE.match(self.nftables_table):
+            raise ConfigError(f"nftables.table: {self.nftables_table!r} must be letters, digits or '_'")
+        if not self.nftables_ports or not all(0 < p < 65536 for p in self.nftables_ports):
+            raise ConfigError("nftables.ports must be a non-empty list of ports between 1 and 65535")
+        if self.format == "nftables" and not self.all_asns() and not self.block_cidrs:
+            raise ConfigError("output.format 'nftables' only blocks networks, and every network list is empty")
         if not re.match(r"^/[A-Za-z0-9_-]+$", self.caddy_block_path):
             raise ConfigError(f"caddy.block_path: {self.caddy_block_path!r} must look like '/__n_antibot_blocked'")
         if self.caddy_ip_matcher not in ("remote_ip", "client_ip"):
@@ -113,8 +121,10 @@ _SCHEMA: dict[str, dict[str, str]] = {
     "output": {"format": "format"},
     "caddy": {"prefix": "caddy_prefix", "block_path": "caddy_block_path", "ip_matcher": "caddy_ip_matcher"},
     "nginx": {"prefix": "nginx_prefix"},
+    "nftables": {"table": "nftables_table", "ports": "nftables_ports"},
 }
-_STRINGS = {"format", "caddy_prefix", "caddy_block_path", "caddy_ip_matcher", "nginx_prefix"}
+_STRINGS = {"format", "caddy_prefix", "caddy_block_path", "caddy_ip_matcher", "nginx_prefix", "nftables_table"}
+_INTS = {"nftables_ports"}
 
 
 def from_dict(data: dict[str, Any]) -> Config:
@@ -133,6 +143,10 @@ def from_dict(data: dict[str, Any]) -> Config:
                 if not isinstance(value, str):
                     raise ConfigError(f"{section}.{key} must be a string")
                 values[attr] = value
+            elif attr in _INTS:
+                if not isinstance(value, list) or not all(type(v) is int for v in value):
+                    raise ConfigError(f"{section}.{key} must be a list of integers")
+                values[attr] = tuple(value)
             else:
                 if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
                     raise ConfigError(f"{section}.{key} must be a list of strings")

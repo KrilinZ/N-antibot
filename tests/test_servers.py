@@ -8,6 +8,7 @@ import http.client
 import shutil
 import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -146,3 +147,142 @@ def test_networks(server, request):
     assert get(port, "/", CHROME) == "closed"
     assert get(port, "/producto/x/", GOOGLE) == "closed"
     assert get(port, "/api/hook", CHROME) == 200
+
+
+# ---------------------------------------------------------------- Apache
+def _apache_binary() -> str | None:
+    for name in ("httpd", "apache2"):
+        for folder in ("/usr/sbin", "/usr/local/bin", "/opt/homebrew/bin"):
+            if Path(folder, name).exists():
+                return str(Path(folder, name))
+    return shutil.which("httpd") or shutil.which("apache2")
+
+
+def _apache_modules() -> Path | None:
+    for folder in ("/usr/libexec/apache2", "/usr/lib/apache2/modules", "/usr/lib64/httpd/modules"):
+        if Path(folder, "mod_rewrite.so").exists():
+            return Path(folder)
+    return None
+
+
+@pytest.fixture
+def apache(tmp_path):
+    binary, modules = _apache_binary(), _apache_modules()
+    if not binary or not modules:
+        pytest.skip("apache not installed")
+    procs = []
+
+    def start(block_loopback: bool, htaccess: bool = False) -> int:
+        port = free_port()
+        d = tmp_path / f"apache{port}"
+        for sub in ("www/api", "www/producto", "www/.well-known"):
+            (d / sub).mkdir(parents=True)
+        for page in ("www/index.html", "www/api/hook", "www/producto/index.html", "www/.well-known/x.txt"):
+            (d / page).write_text("ok")
+        rules = generate(cfg("apache", block_loopback), fetch=no_fetch)
+        (d / "n-antibot.conf").write_text(rules)
+        if htaccess:
+            (d / "www/.htaccess").write_text(rules)
+        load = "".join(
+            f"LoadModule {m}_module {modules}/mod_{m}.so\n"
+            for m in ("mpm_prefork", "unixd", "authz_core", "dir", "rewrite")
+            if (modules / f"mod_{m}.so").exists()
+        )
+        (d / "httpd.conf").write_text(
+            f'ServerRoot "{d}"\nDefaultRuntimeDir "{d}"\nMutex file:{d} default\nPidFile "{d}/httpd.pid"\n'
+            f'Listen 127.0.0.1:{port}\nServerName localhost\n{load}ErrorLog "{d}/error.log"\n'
+            f'DocumentRoot "{d}/www"\nDirectoryIndex index.html\n'
+            f'<Directory "{d}/www">\n\tRequire all granted\n\tAllowOverride All\n</Directory>\n'
+            + ("" if htaccess else f"<VirtualHost 127.0.0.1:{port}>\n\tInclude {d}/n-antibot.conf\n</VirtualHost>\n")
+        )
+        subprocess.run([binary, "-t", "-f", str(d / "httpd.conf")], check=True, capture_output=True)
+        procs.append(
+            subprocess.Popen(
+                [binary, "-f", str(d / "httpd.conf"), "-DFOREGROUND"],
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,  # on shutdown Apache signals its whole process group
+            )
+        )
+        wait(port)
+        return port
+
+    yield start
+    for p in procs:
+        p.terminate()
+        p.wait(10)
+
+
+@pytest.mark.parametrize("htaccess", [False, True], ids=["virtualhost", "htaccess"])
+def test_apache_agents(apache, htaccess):
+    port = apache(False, htaccess)
+    assert get(port, "/", CHROME) == 200
+    assert get(port, "/producto/", GOOGLE) == 200
+    assert get(port, "/", "curl/8.7.1") == 200
+    assert get(port, "/", BYTESPIDER) == 403
+    assert get(port, "/producto/", BYTESPIDER) == 403
+    assert get(port, "/missing.jpg", "python-requests/2.32.3") == 403
+    assert get(port, "/api/hook", "python-requests/2.32.3") == 200
+    assert get(port, "/.well-known/x.txt", BYTESPIDER) == 200
+
+
+@pytest.mark.parametrize("htaccess", [False, True], ids=["virtualhost", "htaccess"])
+def test_apache_networks(apache, htaccess):
+    port = apache(True, htaccess)
+    assert get(port, "/", CHROME) == 403
+    assert get(port, "/producto/", GOOGLE) == 403
+    assert get(port, "/api/hook", CHROME) == 200
+
+
+# ---------------------------------------------------------------- nftables (Linux with passwordless sudo, e.g. CI)
+def _can_nft() -> bool:
+    if not sys.platform.startswith("linux") or not shutil.which("nft"):
+        return False
+    return subprocess.run(["sudo", "-n", "nft", "list", "tables"], capture_output=True).returncode == 0
+
+
+def _reachable(port: int) -> bool:
+    try:
+        socket.create_connection(("127.0.0.1", port), 2).close()
+        return True
+    except OSError:
+        return False
+
+
+@pytest.mark.skipif(not _can_nft(), reason="needs Linux, nft and passwordless sudo")
+def test_nftables_drops_the_blocked_network(tmp_path):
+    port = free_port()
+    server = subprocess.Popen(
+        [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=tmp_path,
+    )
+    table = "n_antibot_test"
+    rules = tmp_path / "n-antibot.nft"
+    rules.write_text(
+        generate(
+            from_dict(
+                {
+                    "networks": {"presets": [], "block": ["127.0.0.0/8", "2001:db8::/32"], "allow": ["127.0.0.9/32"]},
+                    "output": {"format": "nftables"},
+                    "nftables": {"table": table, "ports": [port]},
+                }
+            ),
+            fetch=no_fetch,
+        )
+    )
+    try:
+        wait(port)
+        assert _reachable(port)
+        subprocess.run(["sudo", "-n", "nft", "-c", "-f", str(rules)], check=True)
+        subprocess.run(["sudo", "-n", "nft", "-f", str(rules)], check=True)
+        subprocess.run(["sudo", "-n", "nft", "-f", str(rules)], check=True)  # loading twice replaces the table
+        listed = subprocess.run(["sudo", "-n", "nft", "list", "table", "inet", table], capture_output=True, text=True)
+        assert "2001:db8::/32" in listed.stdout and listed.stdout.count("chain prerouting") == 1
+        assert not _reachable(port)
+        subprocess.run(["sudo", "-n", "nft", "delete", "table", "inet", table], check=True)
+        assert _reachable(port)
+    finally:
+        subprocess.run(["sudo", "-n", "nft", "delete", "table", "inet", table], capture_output=True)
+        server.terminate()
+        server.wait(10)
