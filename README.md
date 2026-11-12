@@ -197,7 +197,7 @@ siempre se pueden poner delante de cualquier servidor. Para una
 tienda o una web pequeña, lo que más duele casi siempre es mucho más simple: **tráfico de centros de datos que nunca
 va a comprar nada** y **raspadores que ni siquiera disimulan su nombre**.
 
-N-antibot nació en una tienda online real para cortar justo eso, con tres principios:
+N-antibot corta justo eso, con tres principios:
 
 | Principio | Qué significa |
 |---|---|

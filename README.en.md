@@ -197,7 +197,7 @@ placed in front of any server. For a shop or a small
 site, what hurts most is often much simpler: **data-center traffic that will never buy anything** and **scrapers
 that do not even hide their name**.
 
-N-antibot was born on a real online shop to cut exactly that, with three principles:
+N-antibot cuts exactly that, with three principles:
 
 | Principle | What it means |
 |---|---|
