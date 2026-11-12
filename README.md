@@ -151,6 +151,7 @@ Caddy, nginx, Apache y `.htaccess`, el cortafuegos de Linux, Cloudflare, Node.js
 - [Instalar en 2 pasos](#-instalar-en-2-pasos)
 - [Qué hace](#-qué-hace)
 - [Por qué existe](#-por-qué-existe)
+- [N-antibot y PerimeterX](#-n-antibot-y-perimeterx)
 - [Qué bloquea y qué no](#️-qué-bloquea-y-qué-no)
 - [Cómo funciona](#️-cómo-funciona)
 - [Guías por tecnología y por caso](#-guías-por-tecnología-y-por-caso)
@@ -204,6 +205,30 @@ N-antibot corta justo eso, con tres principios:
 | **Nada que contratar** | Sin cuentas, sin claves de API, sin JavaScript en tu web y sin dependencias de Python (en 3.9 y 3.10 se instala sola `tomli`, para leer la configuración). |
 | **No romper la web** | Buscadores, robots de IA, navegadores reales, `curl` y tus webhooks nunca se tocan. La configuración se rechaza si una regla tuya pudiera cortar a un navegador o a Google. |
 | **Todo o nada** | Si falla la descarga de rangos no se escribe ningún archivo. El instalador hace copia, valida, recarga, comprueba en vivo y vuelve atrás solo si algo no cuadra. |
+
+## 🥊 N-antibot y PerimeterX
+
+PerimeterX (hoy **HUMAN Bot Defender**) es la referencia comercial contra bots. N-antibot **no hace lo mismo**: resuelve
+gratis, y en dos comandos, la parte del problema que no necesita un servicio así. Esta es la comparación, con lo
+que dice [la documentación de HUMAN](https://docs.humansecurity.com/applications/bd-overview) y lo que hace este código.
+
+| | N-antibot | HUMAN Bot Defender (antes PerimeterX) |
+|---|---|---|
+| **Cómo decide** | Por listas: la red de la que viene la visita (ASN) y el nombre con el que se presenta (`User-Agent`) | Huella del dispositivo, comportamiento y modelos predictivos, según su documentación |
+| **JavaScript en tu web** | Ninguno | Un fragmento que carga su sensor en el navegador del visitante |
+| **Dónde se decide** | En tu servidor, sin consultar a nadie | En su nube: su pieza en tu servidor consulta a su detector |
+| **Bots desde centros de datos** | ✅ Los corta | ✅ |
+| **Raspadores y escáneres que dicen su nombre** | ✅ Los corta | ✅ |
+| **Bots que imitan a una persona desde una conexión doméstica** | ❌ No los detecta | ✅ Para eso está diseñado |
+| **Clics de anuncios hechos por bots, con expediente para reclamar** | ✅ Incluido | No comprobado |
+| **Código** | Abierto (MIT): puedes leer cada regla | Producto comercial |
+| **Coste** | Gratis | De pago |
+| **Datos de tus visitantes** | No salen de tu servidor | Su sensor envía datos del navegador a su nube para analizarlos |
+
+**En una frase:** si lo que te llega son servidores en la nube y raspadores que ni disimulan, N-antibot los para hoy
+y sin pagar. Si te atacan bots que se comportan como personas desde conexiones domésticas, necesitas un servicio
+como PerimeterX; N-antibot no los ve, y lo dice en [sus límites](#-límites-lo-que-n-antibot-no-hace). Los dos
+se pueden usar a la vez.
 
 ## 🛡️ Qué bloquea y qué no
 

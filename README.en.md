@@ -151,6 +151,7 @@ Caddy, nginx, Apache and `.htaccess`, the Linux firewall, Cloudflare, Node.js an
 - [Install in 2 steps](#-install-in-2-steps)
 - [What it does](#-what-it-does)
 - [Why it exists](#-why-it-exists)
+- [N-antibot and PerimeterX](#-n-antibot-and-perimeterx)
 - [What it blocks and what it does not](#️-what-it-blocks-and-what-it-does-not)
 - [How it works](#️-how-it-works)
 - [Guides by technology and by use case](#-guides-by-technology-and-by-use-case)
@@ -204,6 +205,30 @@ N-antibot cuts exactly that, with three principles:
 | **Nothing to sign up for** | No accounts, no API keys, no JavaScript on your site and no Python dependencies (on 3.9 and 3.10, `tomli` is installed automatically to read the configuration). |
 | **Do not break the site** | Search engines, AI crawlers, real browsers, `curl` and your webhooks are never touched. A configuration is rejected if one of your rules could cut off a browser or Google. |
 | **All or nothing** | If downloading the ranges fails, no file is written. The installer backs up, validates, reloads, checks the live site and rolls back by itself if anything is off. |
+
+## 🥊 N-antibot and PerimeterX
+
+PerimeterX (now **HUMAN Bot Defender**) is the commercial reference against bots. N-antibot **does not do the same
+thing**: it solves, for free and in two commands, the part of the problem that does not need such a service. This is
+the comparison, with what [HUMAN's documentation](https://docs.humansecurity.com/applications/bd-overview) says and what this code does.
+
+| | N-antibot | HUMAN Bot Defender (formerly PerimeterX) |
+|---|---|---|
+| **How it decides** | By lists: the network the visit comes from (ASN) and the name it presents (`User-Agent`) | Device fingerprinting, behaviour and predictive models, according to its documentation |
+| **JavaScript on your site** | None | A snippet that loads its sensor in the visitor's browser |
+| **Where the decision is made** | On your server, asking no one | In its cloud: its component on your server queries its detector |
+| **Bots from data centers** | ✅ Cut off | ✅ |
+| **Scrapers and scanners that state their name** | ✅ Cut off | ✅ |
+| **Bots imitating a person from a home connection** | ❌ Not detected | ✅ What it is designed for |
+| **Ad clicks made by bots, with a claim file** | ✅ Included | Not checked |
+| **Code** | Open (MIT): you can read every rule | Commercial product |
+| **Cost** | Free | Paid |
+| **Your visitors' data** | Never leaves your server | Its sensor sends browser data to its cloud for analysis |
+
+**In one sentence:** if what reaches you is cloud servers and scrapers that do not even pretend, N-antibot stops them
+today and for free. If you are attacked by bots that behave like people from home connections, you need a service
+like PerimeterX; N-antibot does not see them, and says so in [its limits](#-limits-what-n-antibot-does-not-do).
+Both can be used together.
 
 ## 🛡️ What it blocks and what it does not
 
