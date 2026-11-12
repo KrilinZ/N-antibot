@@ -12,6 +12,10 @@
 [![Dependencias: 0](https://img.shields.io/badge/dependencias-0-22c55e.svg)](pyproject.toml)
 [![Caddy](https://img.shields.io/badge/Caddy-2.x-1f88c0.svg)](#-instalación-en-caddy)
 [![nginx](https://img.shields.io/badge/nginx-1.x-009639.svg)](#-instalación-en-nginx)
+[![Apache](https://img.shields.io/badge/Apache-2.4-d22128.svg)](docs/es/apache.md)
+[![nftables](https://img.shields.io/badge/nftables-Linux-f59e0b.svg)](docs/es/nftables.md)
+[![Cloudflare](https://img.shields.io/badge/Cloudflare-WAF-f38020.svg)](docs/es/cloudflare.md)
+[![Node.js](https://img.shields.io/badge/Node.js-Express%20%C2%B7%20Next.js-339933.svg)](docs/es/node-express.md)
 
 🇪🇸 Español · [🇬🇧 English](README.en.md)
 
@@ -19,8 +23,8 @@
 
 ---
 
-N-antibot genera un pequeño archivo de configuración para **Caddy** o **nginx** que cierra la conexión, sin responder
-nada, a dos tipos de visitas:
+N-antibot genera un pequeño archivo de configuración para **Caddy**, **nginx**, **Apache**, el **cortafuegos de
+Linux**, **Cloudflare** o tu aplicación **Node.js** que corta, sin llegar a tu web, dos tipos de visitas:
 
 1. Las que llegan desde **redes de servidores en la nube** de donde salen bots que se hacen pasar por Chrome
    (por defecto, Tencent Cloud).
@@ -46,11 +50,12 @@ n-antibot: installed: example.com is protected
 - [Por qué existe](#-por-qué-existe)
 - [Qué bloquea y qué no](#️-qué-bloquea-y-qué-no)
 - [Cómo funciona](#️-cómo-funciona)
+- [Guías por tecnología y por caso](#-guías-por-tecnología-y-por-caso)
 - [Requisitos](#-requisitos)
 - [Instalación](#-instalación)
   - [Instalación en Caddy](#-instalación-en-caddy)
   - [Instalación en nginx](#-instalación-en-nginx)
-  - [Otros servidores (JSON)](#-otros-servidores-vercel-cloudflare-apache-tu-propio-código)
+  - [Más tecnologías](#-más-tecnologías)
 - [Configuración](#-configuración)
 - [Listas incluidas](#-listas-incluidas)
 - [Comandos](#️-comandos)
@@ -111,7 +116,7 @@ flowchart LR
     B -->|une, quita duplicados,<br/>resta lo permitido| C{Formato}
     C --> D[n-antibot.caddy]
     C --> E[n-antibot.conf · nginx]
-    C --> F[n-antibot.json]
+    C --> F[Apache · nftables ·<br/>Cloudflare · JSON]
     D --> G[install/caddy.sh<br/>copia · validate · reload ·<br/>comprobación · vuelta atrás]
 ```
 
@@ -144,6 +149,32 @@ handle /__n_antibot_blocked {
 Las pruebas arrancan un Caddy real con `handle /producto/*` y comprueban que el corte llega también ahí.
 </details>
 
+## 📖 Guías por tecnología y por caso
+
+La documentación completa está en [`docs/es/`](docs/es/README.md). Cada guía dice qué se ha probado y qué no.
+
+| Tecnología | Guía | Qué corta | Probado |
+|---|---|---|:---:|
+| Caddy | [docs/es/caddy.md](docs/es/caddy.md) | redes y robots | ✅ |
+| nginx | [docs/es/nginx.md](docs/es/nginx.md) | redes y robots | ✅ |
+| Apache y `.htaccess` | [docs/es/apache.md](docs/es/apache.md) | redes y robots | ✅ |
+| Cortafuegos de Linux (nftables) | [docs/es/nftables.md](docs/es/nftables.md) | solo redes | ✅ |
+| Node.js y Express | [docs/es/node-express.md](docs/es/node-express.md) | redes y robots | ✅ |
+| Next.js y Vercel | [docs/es/vercel-nextjs.md](docs/es/vercel-nextjs.md) | redes y robots | ⚠️ solo la lógica |
+| Cloudflare | [docs/es/cloudflare.md](docs/es/cloudflare.md) | redes y robots | ⚠️ sin cuenta real |
+
+| Caso de uso | Configuración lista |
+|---|---|
+| [Tienda online](docs/es/casos.md#-tienda-online) | [`shop.toml`](examples/cases/shop.toml) |
+| [Blog, medio o web corporativa](docs/es/casos.md#-blog-medio-o-web-corporativa) | [`blog.toml`](examples/cases/blog.toml) |
+| [Web con API pública](docs/es/casos.md#-web-con-api-pública) | [`public-api.toml`](examples/cases/public-api.toml) |
+| [WordPress](docs/es/casos.md#-wordpress) | [`wordpress.toml`](examples/cases/wordpress.toml) |
+| [Detrás de un CDN o balanceador](docs/es/casos.md#-detrás-de-un-cdn-o-balanceador) | [`behind-cdn.toml`](examples/cases/behind-cdn.toml) |
+| [Protección máxima](docs/es/casos.md#-protección-máxima) | [`strict.toml`](examples/cases/strict.toml) |
+| [Sin robots de IA](docs/es/casos.md#-sin-robots-de-ia) | [`no-ai.toml`](examples/cases/no-ai.toml) |
+| [Cortar antes del servidor web](docs/es/casos.md#-cortar-antes-del-servidor-web) | [`firewall.toml`](examples/cases/firewall.toml) |
+| [Varias webs en un servidor](docs/es/casos.md#-varias-webs-en-un-servidor) · [Me atacan desde otra red](docs/es/casos.md#-me-atacan-desde-otra-red) · [He bloqueado a quien no debía](docs/es/casos.md#-he-bloqueado-a-quien-no-debía) | |
+
 ## 📋 Requisitos
 
 | Qué | Versión | Para qué |
@@ -151,6 +182,9 @@ Las pruebas arrancan un Caddy real con `handle /producto/*` y comprueban que el 
 | Python | 3.11 o superior | Ejecutar `n-antibot` (solo biblioteca estándar) |
 | Caddy | 2.x | Si usas la salida `caddy` |
 | nginx | 1.x con `geo` y `map` (vienen de serie) | Si usas la salida `nginx` |
+| Apache | 2.4 con `mod_rewrite` | Si usas la salida `apache` |
+| nftables | Linux, como root | Si usas la salida `nftables` |
+| Node.js | probado con 24 y 26 | Si usas el middleware de `integrations/node/` |
 | Salida a Internet | hacia `stat.ripe.net` | Solo al generar las listas, no al servir la web |
 
 No hace falta instalar nada en la máquina del servidor si generas el archivo en otra y lo copias.
@@ -167,7 +201,7 @@ O aislado, con [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.1.0`.
+Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.2.0`.
 
 ### 🟦 Instalación en Caddy
 
@@ -291,10 +325,17 @@ El archivo define cuatro variables:
 > Detrás de un proxy o CDN, configura el módulo `realip` de nginx (`set_real_ip_from`, `real_ip_header`) para que
 > `geo` vea la IP real del visitante.
 
-### 🟨 Otros servidores (Vercel, Cloudflare, Apache, tu propio código)
+### 🟨 Más tecnologías
 
-Si tu web no pasa por Caddy ni por nginx, usa la salida en JSON y aplícala donde puedas: una regla de cortafuegos de
-tu CDN, un middleware, fail2ban, iptables/nftables…
+| Tu web pasa por… | Comando | Guía |
+|---|---|---|
+| Apache o un `.htaccess` | `n-antibot generate -f apache -o n-antibot.conf` | [Apache](docs/es/apache.md) |
+| El cortafuegos de Linux | `n-antibot generate -f nftables -o n-antibot.nft` | [nftables](docs/es/nftables.md) |
+| Cloudflare | `n-antibot generate -f cloudflare \| tail -1` | [Cloudflare](docs/es/cloudflare.md) |
+| Node.js o Express | `n-antibot generate -f json -o n-antibot.json` | [Node.js y Express](docs/es/node-express.md) |
+| Next.js o Vercel | `n-antibot generate -f json -o n-antibot.json` | [Next.js y Vercel](docs/es/vercel-nextjs.md) |
+
+Para cualquier otra cosa (otro CDN, fail2ban, tu propio código), la salida en JSON trae las listas en limpio:
 
 ```bash
 n-antibot generate -f json -o n-antibot.json
@@ -302,7 +343,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.1.0",
+  "generator": "n-antibot 0.2.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -333,7 +374,7 @@ allow   = ["aiohttp"]              # sácalos de las listas incluidas
 exclude = ["/.well-known/*", "/api/*", "/webhooks/*", "/health"]
 
 [output]
-format = "caddy"                   # caddy | nginx | json
+format = "caddy"                   # caddy | nginx | apache | nftables | cloudflare | json
 
 [caddy]
 prefix     = "nAntibot"
@@ -342,6 +383,10 @@ ip_matcher = "remote_ip"           # o "client_ip" detrás de un proxy
 
 [nginx]
 prefix = "n_antibot"
+
+[nftables]
+table = "n_antibot"
+ports = [80, 443]
 ```
 
 ### Referencia completa
@@ -356,11 +401,13 @@ prefix = "n_antibot"
 | `robots.block` | lista | `[]` | Fragmentos adicionales. Se buscan en cualquier parte del `User-Agent`, sin distinguir mayúsculas. |
 | `robots.allow` | lista | `[]` | Fragmentos que se quitan de las familias. |
 | `paths.exclude` | lista | `["/.well-known/*"]` | Rutas que nunca se cortan. Formas: `/exacta`, `/prefijo/*`, `*.ext`. |
-| `output.format` | texto | `"caddy"` | `caddy`, `nginx` o `json`. Se puede cambiar con `-f`. |
+| `output.format` | texto | `"caddy"` | `caddy`, `nginx`, `apache`, `nftables`, `cloudflare` o `json`. Se puede cambiar con `-f`. |
 | `caddy.prefix` | texto | `"nAntibot"` | Prefijo de los matchers del archivo. |
 | `caddy.block_path` | texto | `"/__n_antibot_blocked"` | Ruta privada donde se aborta. |
 | `caddy.ip_matcher` | texto | `"remote_ip"` | `remote_ip` (conexión directa) o `client_ip` (detrás de proxy). |
 | `nginx.prefix` | texto | `"n_antibot"` | Prefijo de las variables de nginx. |
+| `nftables.table` | texto | `"n_antibot"` | Nombre de la tabla del cortafuegos. |
+| `nftables.ports` | lista de números | `[80, 443]` | Puertos protegidos (TCP y UDP). |
 
 ### Validaciones que te protegen
 
@@ -514,13 +561,15 @@ A mano: borra la línea `import /etc/caddy/n-antibot.caddy` y recarga Caddy.
 git clone https://github.com/KrilinZ/N-antibot.git && cd N-antibot
 pip install -e . pytest ruff
 pytest -q
+node --test tests/node/n-antibot.test.mjs
 ruff check src tests && ruff format --check src tests
 ```
 
 | Archivo | Qué comprueba |
 |---|---|
 | [`tests/test_unit.py`](tests/test_unit.py) | Agrupación y resta de rangos, validación de la respuesta de RIPEstat, reintentos, cada regla de la configuración, que ninguna lista incluida corte a un navegador o buscador, los tres formatos de salida y la línea de comandos. |
-| [`tests/test_servers.py`](tests/test_servers.py) | **De punta a punta:** arranca un Caddy y un nginx reales con el archivo generado y lanza peticiones. Chrome, Googlebot y curl reciben `200`; Bytespider y python-requests ven la conexión cortada, también en rutas con `handle` propio; las rutas excluidas responden. Se omiten si Caddy o nginx no están instalados. |
+| [`tests/test_servers.py`](tests/test_servers.py) | **De punta a punta:** arranca un Caddy, un nginx y un Apache reales con el archivo generado y lanza peticiones. Chrome, Googlebot y curl reciben `200`; Bytespider y python-requests quedan cortados, también en rutas con `handle` propio y desde un `.htaccess`; las rutas excluidas responden. En Linux carga además las reglas de nftables y comprueba que la red bloqueada deja de conectar. Cada prueba se omite si su servidor no está instalado. |
+| [`tests/node/n-antibot.test.mjs`](tests/node/n-antibot.test.mjs) | El middleware de Node con un servidor HTTP real: rangos IPv4 e IPv6, robots, rutas excluidas, corte de conexión y modo 403. |
 
 ## 🚧 Límites: lo que N-antibot no hace
 
@@ -602,12 +651,14 @@ N-antibot/
 │   ├── presets.py      # redes y robots incluidos, y los User-Agent que nunca se cortan
 │   ├── config.py       # configuración TOML y sus validaciones
 │   ├── ranges.py       # descarga de RIPEstat, agrupación y resta de rangos
-│   ├── render.py       # salidas: Caddy, nginx y JSON
+│   ├── render.py       # salidas: Caddy, nginx, Apache, nftables, Cloudflare y JSON
 │   ├── core.py         # generate(): de la configuración al archivo
 │   ├── cli.py          # línea de comandos
 │   └── example.toml    # configuración de ejemplo (n-antibot init)
 ├── install/caddy.sh    # instalador seguro para Caddy
-├── examples/           # Caddyfile, nginx.conf, configuración y actualización semanal
+├── integrations/node/  # middleware para Node.js, Express y Next.js
+├── docs/es/ · docs/en/ # guías por tecnología y por caso de uso
+├── examples/           # Caddyfile, nginx.conf, actualización semanal y cases/ (configuraciones por caso)
 ├── tests/              # unitarias y de punta a punta con servidores reales
 └── assets/logo.png
 ```
@@ -617,7 +668,7 @@ N-antibot/
 Las propuestas son bienvenidas, sobre todo:
 
 - **Robots o redes nuevas**, con una referencia de por qué merecen estar (registros, documentación del robot).
-- **Salidas para otros servidores** (Apache, HAProxy, Traefik).
+- **Salidas para otros servidores** (HAProxy, Traefik, IIS).
 - **Errores**: abre una [incidencia](https://github.com/KrilinZ/N-antibot/issues) con tu configuración y la salida.
 
 Antes de enviar cambios, ejecuta `pytest -q` y `ruff check src tests`.
