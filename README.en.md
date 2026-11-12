@@ -1,41 +1,47 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="N-antibot: Secure your digital ecosystem" width="320">
+<img src="assets/logo.png" alt="N-antibot: Secure your digital ecosystem" width="300">
 
 # N-antibot
 
-**Cut off bot networks and scrapers at your web server. No accounts, no keys, no dependencies.**
+### Cut bots off at your server, count the ad clicks they made and prepare the claim.
 
+No accounts · no keys · no JavaScript on your site · open source (MIT)
+
+[![Version](https://img.shields.io/github/v/tag/KrilinZ/N-antibot?label=version&color=7c3aed&sort=semver)](https://github.com/KrilinZ/N-antibot/releases)
 [![CI](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml/badge.svg)](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml)
-[![MIT license](https://img.shields.io/badge/license-MIT-2563eb.svg)](LICENSE)
-[![Python 3.9 to 3.14](https://img.shields.io/badge/python-3.9%20%E2%80%93%203.14-7c3aed.svg)](#-compatibility)
-[![Dependencies: 0](https://img.shields.io/badge/dependencies-0%20on%20Python%203.11%2B-22c55e.svg)](pyproject.toml)
-[![Caddy](https://img.shields.io/badge/Caddy-2.x-1f88c0.svg)](#-caddy-setup)
-[![nginx](https://img.shields.io/badge/nginx-1.x-009639.svg)](#-nginx-setup)
-[![Apache](https://img.shields.io/badge/Apache-2.4-d22128.svg)](docs/en/apache.md)
-[![nftables](https://img.shields.io/badge/nftables-Linux-f59e0b.svg)](docs/en/nftables.md)
-[![Cloudflare](https://img.shields.io/badge/Cloudflare-WAF-f38020.svg)](docs/en/cloudflare.md)
-[![Node.js](https://img.shields.io/badge/Node.js-Express%20%C2%B7%20Next.js-339933.svg)](docs/en/node-express.md)
+[![Tests](https://img.shields.io/badge/tests-against%20real%20servers-22c55e)](#-tests)
+[![License MIT](https://img.shields.io/github/license/KrilinZ/N-antibot?label=license&color=2563eb)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/KrilinZ/N-antibot?label=last%20commit&color=2563eb)](https://github.com/KrilinZ/N-antibot/commits/main)
+[![Stars](https://img.shields.io/github/stars/KrilinZ/N-antibot?style=flat&label=stars&color=f59e0b)](https://github.com/KrilinZ/N-antibot/stargazers)
+
+[![Python 3.9 – 3.14](https://img.shields.io/badge/python-3.9%20%E2%80%93%203.14-3776ab?logo=python&logoColor=white)](#-compatibility)
+[![Linux · macOS · Windows](https://img.shields.io/badge/Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-tested-0ea5e9)](#-compatibility)
+[![Dependencies: 0](https://img.shields.io/badge/dependencies-0%20on%20Python%203.11%2B-22c55e)](pyproject.toml)
+[![Docs](https://img.shields.io/badge/docs-ES%20%C2%B7%20EN-8b5cf6)](docs/en/README.md)
+[![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1-6ba539?logo=openapiinitiative&logoColor=white)](docs/openapi.json)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-ec4899)](CONTRIBUTING.md)
+
+[![Caddy](https://img.shields.io/badge/Caddy-2.x-1f88c0?logo=caddy&logoColor=white)](docs/en/caddy.md)
+[![nginx](https://img.shields.io/badge/nginx-1.x-009639?logo=nginx&logoColor=white)](docs/en/nginx.md)
+[![Apache](https://img.shields.io/badge/Apache-2.4-d22128?logo=apache&logoColor=white)](docs/en/apache.md)
+[![nftables](https://img.shields.io/badge/Linux-nftables-f59e0b?logo=linux&logoColor=white)](docs/en/nftables.md)
+[![Cloudflare](https://img.shields.io/badge/Cloudflare-WAF-f38020?logo=cloudflare&logoColor=white)](docs/en/cloudflare.md)
+[![Node.js](https://img.shields.io/badge/Node.js-18%20%E2%80%93%2024-339933?logo=nodedotjs&logoColor=white)](docs/en/node-express.md)
+[![Next.js](https://img.shields.io/badge/Next.js-middleware-000000?logo=nextdotjs&logoColor=white)](docs/en/vercel-nextjs.md)
+[![Google Ads](https://img.shields.io/badge/Google%20Ads-claim%20file-4285f4?logo=googleads&logoColor=white)](#-where-to-claim-fraudulent-clicks)
+
+[**Install**](#-install-in-2-steps) · [What it does](#-what-it-does) · [Guides](docs/en/README.md) · [Ad report](#-report-bots-and-ad-clicks) · [Where to claim](#-where-to-claim-fraudulent-clicks) · [API](#-data-api) · [Changelog](CHANGELOG.md)
 
 [🇪🇸 Español](README.md) · 🇬🇧 English
+
+<br>
+
+<img src="assets/demo.svg" alt="N-antibot installed in two commands, then a report of ad clicks made by bots" width="860">
 
 </div>
 
 ---
-
-N-antibot generates a small configuration file for **Caddy**, **nginx**, **Apache**, the **Linux firewall**,
-**Cloudflare** or your **Node.js** application that cuts off, before they reach your site, two kinds of visits:
-
-1. Those coming from **cloud server networks** that are a common source of bots pretending to be Chrome
-   (Tencent Cloud by default).
-2. Those from **robots and scraping libraries** that bring no visitors: Bytespider, MJ12bot, python-requests,
-   Scrapy, vulnerability scanners…
-
-Google, Bing, AI crawlers, your customers and `curl` keep getting in as usual.
-
-It also **reads your logs and counts how many ad clicks were made by a bot**, with a CSV ready to
-[claim them from Google, Microsoft and the other platforms](#-where-to-claim-fraudulent-clicks), and an
-[API](#-data-api) to query that data.
 
 ## ⚡ Install in 2 steps
 
@@ -79,41 +85,115 @@ n-antibot: installed: example.com is protected
 No administrator access, or your site goes through Cloudflare, Vercel or Node? See the
 [guides by technology](#-guides-by-technology-and-by-use-case).
 
+## ✨ What it does
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+### 🛡️ Cuts bots off
+
+Data-center networks and scrapers get no answer. Google, Bing, AI crawlers and your customers get in as usual.
+
+</td>
+<td width="33%" valign="top">
+
+### 💶 Counts fake clicks
+
+Reads your server logs and tells you how many paid ad clicks were made by a bot.
+
+</td>
+<td width="33%" valign="top">
+
+### 📁 Prepares the claim
+
+One file set per platform with what each one asks for: GCLID, IP, browser, campaign, deadline and the text to paste.
+
+</td>
+</tr>
+<tr>
+<td width="33%" valign="top">
+
+### ⚡ Installs itself
+
+Two commands. It backs up, validates, reloads, checks live and, if anything fails, puts everything back.
+
+</td>
+<td width="33%" valign="top">
+
+### 🔌 Data API
+
+`n-antibot serve`: the same data as JSON for your dashboard or alerts. Read-only, with a token and OpenAPI.
+
+</td>
+<td width="33%" valign="top">
+
+### 🌍 Wherever your site runs
+
+Caddy, nginx, Apache and `.htaccess`, the Linux firewall, Cloudflare, Node.js and Next.js.
+
+</td>
+</tr>
+</table>
+
+<table align="center">
+<tr><td align="center"><b>7</b><br><sub>technologies</sub></td><td align="center"><b>6</b><br><sub>ad platforms documented</sub></td><td align="center"><b>90+</b><br><sub>tests, against real servers</sub></td><td align="center"><b>14</b><br><sub>combinations tested on every change</sub></td><td align="center"><b>0</b><br><sub>dependencies (Python 3.11+)</sub></td><td align="center"><b>2</b><br><sub>languages</sub></td></tr>
+</table>
 
 ## 📚 Contents
 
+<table>
+<tr>
+<td valign="top">
+
+**Start**
+
 - [Install in 2 steps](#-install-in-2-steps)
+- [What it does](#-what-it-does)
 - [Why it exists](#-why-it-exists)
 - [What it blocks and what it does not](#️-what-it-blocks-and-what-it-does-not)
 - [How it works](#️-how-it-works)
 - [Guides by technology and by use case](#-guides-by-technology-and-by-use-case)
-- [Requirements](#-requirements)
-- [Compatibility](#-compatibility)
-- [Installation](#-installation)
-  - [Caddy setup](#-caddy-setup)
-  - [nginx setup](#-nginx-setup)
-  - [More technologies](#-more-technologies)
-- [Configuration](#-configuration)
-- [Built-in lists](#-built-in-lists)
-- [Commands](#️-commands)
+
+</td>
+<td valign="top">
+
+**Use**
+
 - [Report: bots and ad clicks](#-report-bots-and-ad-clicks)
 - [Where to claim fraudulent clicks](#-where-to-claim-fraudulent-clicks)
 - [Data API](#-data-api)
-- [Python API](#-python-api)
+- [Manual installation](#-installation)
 - [Keeping the lists fresh](#-keeping-the-lists-fresh)
 - [Checking that it works](#-checking-that-it-works)
 - [Removing it](#-removing-it)
+
+</td>
+<td valign="top">
+
+**Reference**
+
+- [Configuration](#-configuration)
+- [Built-in lists](#-built-in-lists)
+- [Commands](#️-commands)
+- [Python API](#-python-api)
+- [Requirements](#-requirements)
+- [Compatibility](#-compatibility)
 - [Tests](#-tests)
-- [Limits: what N-antibot does not do](#-limits-what-n-antibot-does-not-do)
+- [Limits](#-limits-what-n-antibot-does-not-do)
 - [FAQ](#-faq)
+- [Roadmap](#️-roadmap)
 - [Project layout](#️-project-layout)
 - [Contributing](#-contributing)
-- [License](#-license)
+
+</td>
+</tr>
+</table>
 
 ## 💡 Why it exists
 
-Commercial anti-bot services (PerimeterX/HUMAN, DataDome, Cloudflare Bot Management) work well, but they usually
-require a contract, are billed per request and cannot always be placed in front of any server. For a shop or a small
+Commercial anti-bot services work well, but many require a contract, are billed per request and cannot always be
+placed in front of any server. For a shop or a small
 site, what hurts most is often much simpler: **data-center traffic that will never buy anything** and **scrapers
 that do not even hide their name**.
 
@@ -188,6 +268,96 @@ handle /__n_antibot_blocked {
 The tests start a real Caddy with `handle /product/*` and check that the cut reaches it too.
 </details>
 
+## 📊 Report: bots and ad clicks
+
+`n-antibot report` reads your server's access logs (Caddy, nginx or Apache) and tells you how many visits are bots
+and **how many paid ad clicks were made by a bot**, with a CSV (date, IP, browser and `gclid`) that is exactly what
+Google asks for to investigate invalid clicks and credit them.
+
+```console
+$ n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --csv bot-clicks.csv
+Bots
+  Requests from bots: 3 (50.0%) from 2 IPs
+    cut off:  2
+    served:   1   <- N-antibot is not stopping these yet
+Paid ad clicks
+  google: 4 clicks
+    bots:        3 (75.0%)  [network 2, robot 1]
+    suspicious:  0 (0.0%)  [repeated IP 0, no resources 0]
+    clean:       1
+  ...
+n-antibot: 4 ad clicks written to bot-clicks.csv
+```
+
+> [!WARNING]
+> Cutting the bot off does not avoid the charge: the click happens at Google before reaching your site. The money
+> is recovered by claiming, and that is what the CSV is for.
+
+Full guide: [docs/en/ads-report.md](docs/en/ads-report.md).
+
+## 💶 Where to claim fraudulent clicks
+
+What each platform's official documentation says, read on 12 November 2026. Platforms change their rules: open the
+source before you claim.
+
+| Platform | Where to claim | Deadline | What it asks for | What you can expect |
+|---|---|---|---|---|
+| **Google Ads** | [Click Quality Form](https://support.google.com/google-ads/contact/click_quality) | Last 60 days | Dates; campaigns and ad groups; keywords; web server logs with IP, browser and GCLID; why it is suspicious | Specialists review it and email the findings. If they find more invalid traffic, they notify you of the credit. No click-by-click confirmation. [Source](https://support.google.com/google-ads/answer/11182074) |
+| **Microsoft Advertising** (Bing) | [Support](https://go.microsoft.com/fwlink?LinkId=398371), saying it is an "invalid clicks" issue | Best within 30 days; no investigation after 60 | Ad group and its number; ad ID and keywords; dates; what you see in your reports or logs; a log sample if asked | They try to finish within 9 days and recommend reimbursement if the traffic is invalid. [Source](https://help.ads.microsoft.com/#apex/ads/en/60220/0) |
+| **LinkedIn Ads** | [Marketing Solutions support](https://www.linkedin.com/help/lms/ask), in writing | 90 days | The fees you dispute and why | Ad credit only, at LinkedIn's discretion; no cash refund. [Source](https://www.linkedin.com/legal/sas-terms) |
+| **X Ads** | [Support ticket](https://ads.x.com/en/help), in writing | 60 days from the charge (US agreement) | The charges you dispute | A refund only if they find a billing or technical error. [Source](https://help.x.com/en/business-and-advertising/billing-basics) |
+| **Meta Ads** (Facebook, Instagram) | [Ads payment support form](https://www.facebook.com/help/contact/649167531904667). **No documented process for invalid clicks** | None stated | It does not say | Decided case by case, at Meta's discretion, and final. At least one month. No refunds for poor performance. [Source](https://www.facebook.com/business/help/211313200321572) |
+| **Pinterest Ads** | Support. **No documented process for invalid clicks** | None stated | It does not say | It says standard charges are usually not eligible for a refund. [Source](https://help.pinterest.com/en/business/article/refunds-and-chargebacks) |
+| **TikTok Ads, Amazon Ads** | No process found in their help (searched only; their pages were not opened one by one) | | | |
+
+`n-antibot report --claim-dir claim/` prepares **one file set per platform** with what each one asks for:
+
+```console
+$ n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --claim-dir claim/
+n-antibot: Google Ads: 4 clicks (4 within the deadline) -> claim/google-claim.txt
+n-antibot: Meta Ads (Facebook, Instagram): 1 clicks (1 within the deadline) -> claim/meta-claim.txt (the platform documents no process for invalid clicks)
+```
+
+| File | Content |
+|---|---|
+| `google-claim.txt` | Where to claim, the deadline, what the platform asks for, how many clicks are still within the deadline, the IPs with the reason, and **a text ready to paste** explaining why they are suspicious |
+| `google-clicks.csv` | One click per row: date and time (UTC), `click_id` (GCLID), IP, browser, verdict, reason, network and ASN, campaign, ad group, ad and keyword (when the URL carries them) and whether it is within the deadline |
+| `google-log-sample.log` | The exact web server log lines of those clicks |
+
+What the log cannot know and you must add: your account ID and the campaign, ad group and keyword names of the
+clicks whose URL does not carry them. If you add those to your tracking template (`utm_campaign`, `utm_term`…), the
+next report already has them.
+
+> [!WARNING]
+> **Cutting the bot off does not avoid the charge:** the click happens at the platform before the visit reaches
+> your site. And no platform guarantees a refund: they all decide themselves, and several only give ad credit.
+
+## 🔌 Data API
+
+`n-antibot serve` starts a read-only JSON API with the same data: for your dashboard, a spreadsheet or an alert.
+
+```console
+$ export N_ANTIBOT_TOKEN="$(openssl rand -hex 24)"
+$ n-antibot serve '/var/log/nginx/access.log*'
+n-antibot: API on http://127.0.0.1:8787 (token required)
+$ curl -H "Authorization: Bearer $N_ANTIBOT_TOKEN" "http://127.0.0.1:8787/v1/ad-clicks?verdict=bot&platform=google"
+```
+
+| Endpoint | What it returns |
+|---|---|
+| `GET /v1/summary` | Requests, bots and ad clicks per platform |
+| `GET /v1/bots` | Bots by network and by robot, and the busiest unblocked visitors |
+| `GET /v1/ad-clicks` | Ad clicks one by one, with filters, paging and CSV |
+| `GET /v1/claims` | Where to claim on each platform, what it asks for and how many clicks you have within the deadline |
+| `GET /v1/check` | Whether an IP or a browser would be blocked |
+| `GET /v1/blocklist` | The ranges and robots in use |
+| `GET /health`, `GET /v1/openapi.json` | Service status and OpenAPI 3.1 specification (no token) |
+
+It only listens on `127.0.0.1` unless you give it a token; the token goes in the header, never in the URL.
+
+Full guide, with every parameter, every field, errors, examples and deployment:
+[docs/en/api.md](docs/en/api.md) · [openapi.json](docs/openapi.json).
+
 ## 📖 Guides by technology and by use case
 
 The full documentation lives in [`docs/en/`](docs/en/README.md). Every guide says what has been tested and what
@@ -214,49 +384,6 @@ has not.
 | [No AI crawlers](docs/en/cases.md#-no-ai-crawlers) | [`no-ai.toml`](examples/cases/no-ai.toml) |
 | [Cutting before the web server](docs/en/cases.md#-cutting-before-the-web-server) | [`firewall.toml`](examples/cases/firewall.toml) |
 | [Several sites on one server](docs/en/cases.md#-several-sites-on-one-server) · [I am being hit from another network](docs/en/cases.md#-i-am-being-hit-from-another-network) · [I blocked someone I should not have](docs/en/cases.md#-i-blocked-someone-i-should-not-have) | |
-
-## 📋 Requirements
-
-| What | Version | What for |
-|---|---|---|
-| Python | 3.9 or later | Running `n-antibot` (standard library only; on 3.9 and 3.10, plus `tomli`) |
-| Caddy | 2.x | If you use the `caddy` output |
-| nginx | 1.x with `geo` and `map` (built in) | If you use the `nginx` output |
-| Apache | 2.4 with `mod_rewrite` | If you use the `apache` output |
-| nftables | Linux, as root | If you use the `nftables` output |
-| Node.js | 18 or later | If you use the middleware in `integrations/node/` |
-| Internet access | to `stat.ripe.net` | Only when generating the lists, not when serving the site |
-
-Nothing has to be installed on the server itself if you generate the file elsewhere and copy it over.
-
-## 🧬 Compatibility
-
-These are the versions the tests run against on every change
-([continuous integration](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml)). Anything not listed
-here is untested, even if it may work.
-
-| Piece | Tested versions | How |
-|---|---|---|
-| **Python** | 3.9, 3.10, 3.11, 3.12, 3.13 and 3.14 | Every test, on each version |
-| **Systems** | Ubuntu 22.04, 24.04 and 26.04, macOS | The tests for the servers available on each system |
-| **Windows** | Windows Server (GitHub) | Generator and command line only: there are no servers to test |
-| **Caddy** | 2.6.2 (Ubuntu 24.04 and 26.04) and 2.11 (macOS) | End to end |
-| **nginx** | 1.18 (Ubuntu 22.04), 1.24 (Ubuntu 24.04) and 1.31 (macOS) | End to end |
-| **Apache** | 2.4.52, 2.4.58, 2.4.66 and 2.4.67 | End to end, in `<VirtualHost>` and in `.htaccess` |
-| **nftables** | 1.0.2 (Ubuntu 22.04) and 1.0.9 (Ubuntu 24.04) | End to end: loads the rules and checks the cut |
-| **Node.js** | 18, 20, 22 and 24 | The middleware, with a real HTTP server |
-| **Cloudflare** | | Not tested on an account: expression checked against their documentation |
-| **Vercel** | | Not tested on a deployment: middleware logic only |
-
-| Compatible with… | Detail |
-|---|---|
-| **IPv4 and IPv6** | In every output. The Node middleware also understands IPv4 written inside IPv6 (`::ffff:1.2.3.4`). |
-| **HTTP/1.1, HTTP/2 and HTTP/3** | The cut is made by IP, `User-Agent` and path, which exist in all three. The firewall covers TCP and UDP. |
-| **Proxies and CDNs** | With the real IP configured: `client_ip` in Caddy, `realip` in nginx, `mod_remoteip` in Apache. |
-| **Docker** | The file is mounted into the container; the firewall also covers ports published by Docker. |
-| **Your current rules** | Caddy: one `import`. nginx: variables with their own prefix. Apache: `Rewrite` rules that live alongside yours. nftables: a separate table. Nothing overwrites what you already have. |
-| **Shared hosting** | Through `.htaccess`, if the host runs Apache 2.4 with `mod_rewrite`. |
-| **Plain-text output** | Generated files and messages are ASCII: no encoding trouble on any console. |
 
 ## 🚀 Installation
 
@@ -563,96 +690,6 @@ $ n-antibot check -o /etc/caddy/n-antibot.caddy
 /etc/caddy/n-antibot.caddy: up to date
 ```
 
-## 📊 Report: bots and ad clicks
-
-`n-antibot report` reads your server's access logs (Caddy, nginx or Apache) and tells you how many visits are bots
-and **how many paid ad clicks were made by a bot**, with a CSV (date, IP, browser and `gclid`) that is exactly what
-Google asks for to investigate invalid clicks and credit them.
-
-```console
-$ n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --csv bot-clicks.csv
-Bots
-  Requests from bots: 3 (50.0%) from 2 IPs
-    cut off:  2
-    served:   1   <- N-antibot is not stopping these yet
-Paid ad clicks
-  google: 4 clicks
-    bots:        3 (75.0%)  [network 2, robot 1]
-    suspicious:  0 (0.0%)  [repeated IP 0, no resources 0]
-    clean:       1
-  ...
-n-antibot: 4 ad clicks written to bot-clicks.csv
-```
-
-> [!WARNING]
-> Cutting the bot off does not avoid the charge: the click happens at Google before reaching your site. The money
-> is recovered by claiming, and that is what the CSV is for.
-
-Full guide: [docs/en/ads-report.md](docs/en/ads-report.md).
-
-## 💶 Where to claim fraudulent clicks
-
-What each platform's official documentation says, read on 12 November 2026. Platforms change their rules: open the
-source before you claim.
-
-| Platform | Where to claim | Deadline | What it asks for | What you can expect |
-|---|---|---|---|---|
-| **Google Ads** | [Click Quality Form](https://support.google.com/google-ads/contact/click_quality) | Last 60 days | Dates; campaigns and ad groups; keywords; web server logs with IP, browser and GCLID; why it is suspicious | Specialists review it and email the findings. If they find more invalid traffic, they notify you of the credit. No click-by-click confirmation. [Source](https://support.google.com/google-ads/answer/11182074) |
-| **Microsoft Advertising** (Bing) | [Support](https://go.microsoft.com/fwlink?LinkId=398371), saying it is an "invalid clicks" issue | Best within 30 days; no investigation after 60 | Ad group and its number; ad ID and keywords; dates; what you see in your reports or logs; a log sample if asked | They try to finish within 9 days and recommend reimbursement if the traffic is invalid. [Source](https://help.ads.microsoft.com/#apex/ads/en/60220/0) |
-| **LinkedIn Ads** | [Marketing Solutions support](https://www.linkedin.com/help/lms/ask), in writing | 90 days | The fees you dispute and why | Ad credit only, at LinkedIn's discretion; no cash refund. [Source](https://www.linkedin.com/legal/sas-terms) |
-| **X Ads** | [Support ticket](https://ads.x.com/en/help), in writing | 60 days from the charge (US agreement) | The charges you dispute | A refund only if they find a billing or technical error. [Source](https://help.x.com/en/business-and-advertising/billing-basics) |
-| **Meta Ads** (Facebook, Instagram) | [Ads payment support form](https://www.facebook.com/help/contact/649167531904667). **No documented process for invalid clicks** | None stated | It does not say | Decided case by case, at Meta's discretion, and final. At least one month. No refunds for poor performance. [Source](https://www.facebook.com/business/help/211313200321572) |
-| **Pinterest Ads** | Support. **No documented process for invalid clicks** | None stated | It does not say | It says standard charges are usually not eligible for a refund. [Source](https://help.pinterest.com/en/business/article/refunds-and-chargebacks) |
-| **TikTok Ads, Amazon Ads** | No process found in their help (searched only; their pages were not opened one by one) | | | |
-
-`n-antibot report --claim-dir claim/` prepares **one file set per platform** with what each one asks for:
-
-```console
-$ n-antibot report /var/log/nginx/access.log* --since 2026-10-01 --claim-dir claim/
-n-antibot: Google Ads: 4 clicks (4 within the deadline) -> claim/google-claim.txt
-n-antibot: Meta Ads (Facebook, Instagram): 1 clicks (1 within the deadline) -> claim/meta-claim.txt (the platform documents no process for invalid clicks)
-```
-
-| File | Content |
-|---|---|
-| `google-claim.txt` | Where to claim, the deadline, what the platform asks for, how many clicks are still within the deadline, the IPs with the reason, and **a text ready to paste** explaining why they are suspicious |
-| `google-clicks.csv` | One click per row: date and time (UTC), `click_id` (GCLID), IP, browser, verdict, reason, network and ASN, campaign, ad group, ad and keyword (when the URL carries them) and whether it is within the deadline |
-| `google-log-sample.log` | The exact web server log lines of those clicks |
-
-What the log cannot know and you must add: your account ID and the campaign, ad group and keyword names of the
-clicks whose URL does not carry them. If you add those to your tracking template (`utm_campaign`, `utm_term`…), the
-next report already has them.
-
-> [!WARNING]
-> **Cutting the bot off does not avoid the charge:** the click happens at the platform before the visit reaches
-> your site. And no platform guarantees a refund: they all decide themselves, and several only give ad credit.
-
-## 🔌 Data API
-
-`n-antibot serve` starts a read-only JSON API with the same data: for your dashboard, a spreadsheet or an alert.
-
-```console
-$ export N_ANTIBOT_TOKEN="$(openssl rand -hex 24)"
-$ n-antibot serve '/var/log/nginx/access.log*'
-n-antibot: API on http://127.0.0.1:8787 (token required)
-$ curl -H "Authorization: Bearer $N_ANTIBOT_TOKEN" "http://127.0.0.1:8787/v1/ad-clicks?verdict=bot&platform=google"
-```
-
-| Endpoint | What it returns |
-|---|---|
-| `GET /v1/summary` | Requests, bots and ad clicks per platform |
-| `GET /v1/bots` | Bots by network and by robot, and the busiest unblocked visitors |
-| `GET /v1/ad-clicks` | Ad clicks one by one, with filters, paging and CSV |
-| `GET /v1/claims` | Where to claim on each platform, what it asks for and how many clicks you have within the deadline |
-| `GET /v1/check` | Whether an IP or a browser would be blocked |
-| `GET /v1/blocklist` | The ranges and robots in use |
-| `GET /health`, `GET /v1/openapi.json` | Service status and OpenAPI 3.1 specification (no token) |
-
-It only listens on `127.0.0.1` unless you give it a token; the token goes in the header, never in the URL.
-
-Full guide, with every parameter, every field, errors, examples and deployment:
-[docs/en/api.md](docs/en/api.md) · [openapi.json](docs/openapi.json).
-
 ## 🐍 Python API
 
 ```python
@@ -727,6 +764,49 @@ By hand: delete the `import /etc/caddy/n-antibot.caddy` line and reload Caddy.
 
 **nginx:** delete the `if ($n_antibot_block) { return 444; }` line and the `include`, then reload with
 `sudo nginx -t && sudo nginx -s reload`.
+
+## 📋 Requirements
+
+| What | Version | What for |
+|---|---|---|
+| Python | 3.9 or later | Running `n-antibot` (standard library only; on 3.9 and 3.10, plus `tomli`) |
+| Caddy | 2.x | If you use the `caddy` output |
+| nginx | 1.x with `geo` and `map` (built in) | If you use the `nginx` output |
+| Apache | 2.4 with `mod_rewrite` | If you use the `apache` output |
+| nftables | Linux, as root | If you use the `nftables` output |
+| Node.js | 18 or later | If you use the middleware in `integrations/node/` |
+| Internet access | to `stat.ripe.net` | Only when generating the lists, not when serving the site |
+
+Nothing has to be installed on the server itself if you generate the file elsewhere and copy it over.
+
+## 🧬 Compatibility
+
+These are the versions the tests run against on every change
+([continuous integration](https://github.com/KrilinZ/N-antibot/actions/workflows/ci.yml)). Anything not listed
+here is untested, even if it may work.
+
+| Piece | Tested versions | How |
+|---|---|---|
+| **Python** | 3.9, 3.10, 3.11, 3.12, 3.13 and 3.14 | Every test, on each version |
+| **Systems** | Ubuntu 22.04, 24.04 and 26.04, macOS | The tests for the servers available on each system |
+| **Windows** | Windows Server (GitHub) | Generator and command line only: there are no servers to test |
+| **Caddy** | 2.6.2 (Ubuntu 24.04 and 26.04) and 2.11 (macOS) | End to end |
+| **nginx** | 1.18 (Ubuntu 22.04), 1.24 (Ubuntu 24.04) and 1.31 (macOS) | End to end |
+| **Apache** | 2.4.52, 2.4.58, 2.4.66 and 2.4.67 | End to end, in `<VirtualHost>` and in `.htaccess` |
+| **nftables** | 1.0.2 (Ubuntu 22.04) and 1.0.9 (Ubuntu 24.04) | End to end: loads the rules and checks the cut |
+| **Node.js** | 18, 20, 22 and 24 | The middleware, with a real HTTP server |
+| **Cloudflare** | | Not tested on an account: expression checked against their documentation |
+| **Vercel** | | Not tested on a deployment: middleware logic only |
+
+| Compatible with… | Detail |
+|---|---|
+| **IPv4 and IPv6** | In every output. The Node middleware also understands IPv4 written inside IPv6 (`::ffff:1.2.3.4`). |
+| **HTTP/1.1, HTTP/2 and HTTP/3** | The cut is made by IP, `User-Agent` and path, which exist in all three. The firewall covers TCP and UDP. |
+| **Proxies and CDNs** | With the real IP configured: `client_ip` in Caddy, `realip` in nginx, `mod_remoteip` in Apache. |
+| **Docker** | The file is mounted into the container; the firewall also covers ports published by Docker. |
+| **Your current rules** | Caddy: one `import`. nginx: variables with their own prefix. Apache: `Rewrite` rules that live alongside yours. nftables: a separate table. Nothing overwrites what you already have. |
+| **Shared hosting** | Through `.htaccess`, if the host runs Apache 2.4 with `mod_rewrite`. |
+| **Plain-text output** | Generated files and messages are ASCII: no encoding trouble on any console. |
 
 ## 🧪 Tests
 
@@ -816,6 +896,21 @@ Look in your access logs for the IPs making the most requests and look them up o
 [stat.ripe.net](https://stat.ripe.net/): it tells you which ASN they belong to. Add it to `networks.asns`.
 </details>
 
+## 🗺️ Roadmap
+
+Ideas, with no committed date. If you need one, [say so in an issue](https://github.com/KrilinZ/N-antibot/issues).
+
+| Idea | Status |
+|---|---|
+| Publish on PyPI (`pip install n-antibot`) | Pending |
+| Outputs for HAProxy, Traefik and IIS | Pending |
+| Docker image with the API | Pending |
+| More built-in networks (other clouds) with their ASN verified | Pending |
+| Test Cloudflare on a real account and Vercel on a deployment | Pending: today it is only checked against their documentation |
+| Claim routes for TikTok Ads and Amazon Ads | Pending: no documented route was found |
+
+What is already done, version by version: [CHANGELOG.md](CHANGELOG.md).
+
 ## 🗂️ Project layout
 
 ```text
@@ -849,7 +944,13 @@ Proposals are welcome, especially:
 - **Outputs for other servers** (HAProxy, Traefik, IIS).
 - **Bugs**: open an [issue](https://github.com/KrilinZ/N-antibot/issues) with your configuration and the output.
 
-Before sending changes, run `pytest -q` and `ruff check src tests`.
+Before sending changes, run `pytest -q` and `ruff check src tests`. More in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+| Document | What for |
+|---|---|
+| [CHANGELOG.md](CHANGELOG.md) | What changed in each version |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to propose robots, networks, outputs and ad platforms |
+| [SECURITY.md](SECURITY.md) | How to report a security problem |
 
 ## 📄 License
 

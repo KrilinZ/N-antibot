@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 506" width="1000" height="506" role="img" aria-label="N-antibot installed in two commands, then a report of ad clicks made by bots">
+<defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#1b2a6b"/><stop offset="1" stop-color="#5b21b6"/></linearGradient></defs>
+<rect width="1000" height="506" rx="14" fill="url(#g)"/>
+<rect x="6" y="6" width="988" height="494" rx="10" fill="#0d1117"/>
+<rect x="6" y="6" width="988" height="34" rx="10" fill="#161b22"/><rect x="6" y="28" width="988" height="12" fill="#161b22"/>
+<circle cx="28" cy="23" r="6" fill="#ff5f57"/><circle cx="48" cy="23" r="6" fill="#febc2e"/><circle cx="68" cy="23" r="6" fill="#28c840"/>
+<text x="500" y="27" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#8b949e">n-antibot</text>
+<g font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12.5" xml:space="preserve">
+<text x="26" y="62"><tspan fill="#3fb950" font-weight="700">$ </tspan><tspan fill="#e6edf3" font-weight="600">curl -fsSL https://raw.githubusercontent.com/KrilinZ/N-antibot/main/install.sh | sudo sh</tspan></text>
+<text x="26" y="84" fill="#8b949e">n-antibot: using Python 3.12.3, installing into /opt/n-antibot</text>
+<text x="26" y="106" fill="#c9d1d9">n-antibot: installed n-antibot 0.6.0</text>
+<text x="26" y="150"><tspan fill="#3fb950" font-weight="700">$ </tspan><tspan fill="#e6edf3" font-weight="600">sudo n-antibot install --site example.com --check-url https://example.com</tspan></text>
+<text x="26" y="172" fill="#8b949e">n-antibot: found example.com in /etc/caddy/Caddyfile (caddy)</text>
+<text x="26" y="194" fill="#8b949e">n-antibot: add 1 line: import /etc/caddy/n-antibot.caddy</text>
+<text x="26" y="216" fill="#8b949e">n-antibot: backup in /var/backups/n-antibot/20261112-233030</text>
+<text x="26" y="238" fill="#8b949e">n-antibot: caddy reloaded</text>
+<text x="26" y="260" fill="#3fb950">n-antibot: ok   browser    -&gt; 200</text>
+<text x="26" y="282" fill="#3fb950">n-antibot: ok   Googlebot  -&gt; 200</text>
+<text x="26" y="304" fill="#3fb950">n-antibot: ok   curl       -&gt; 200</text>
+<text x="26" y="326" fill="#f778ba">n-antibot: ok   Bytespider -&gt; closed (expected closed)</text>
+<text x="26" y="348" fill="#58a6ff">n-antibot: installed: example.com is protected</text>
+<text x="26" y="392"><tspan fill="#3fb950" font-weight="700">$ </tspan><tspan fill="#e6edf3" font-weight="600">n-antibot report /var/log/caddy/access.log --claim-dir claim/</tspan></text>
+<text x="26" y="414" fill="#c9d1d9">  google: 5 clicks</text>
+<text x="26" y="436" fill="#d29922">    bots:        4 (80.0%)  [network 3, robot 1]</text>
+<text x="26" y="458" fill="#8b949e">n-antibot: Google Ads: 4 clicks (4 within the deadline) -&gt; claim/google-claim.txt</text>
+</g>
+</svg>
