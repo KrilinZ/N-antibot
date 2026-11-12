@@ -8,12 +8,23 @@ import sys
 import time
 
 import pytest
-from test_servers import BYTESPIDER, CHROME, _apache_binary, _apache_modules, free_port, get, no_fetch, wait
+from test_servers import BYTESPIDER, CHROME, _apache_binary, _apache_modules, free_port, no_fetch, wait
+from test_servers import get as _get
 
 from n_antibot import generate, installer
 from n_antibot.config import from_dict
 
 SITE = "shop.example.test"
+
+
+def get(port, path, agent):
+    """Like test_servers.get, but patient: while a server reloads, a connection can be refused for an instant."""
+    for _ in range(30):
+        try:
+            return _get(port, path, agent)
+        except ConnectionRefusedError:
+            time.sleep(0.1)
+    return _get(port, path, agent)
 
 
 def snippet(fmt):
