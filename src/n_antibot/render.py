@@ -8,6 +8,10 @@ from dataclasses import dataclass, replace
 
 from . import __version__
 from .config import Config
+from .presets import AD_CLICK_PARAMS
+
+# A paid-click identifier in the query string: gclid=..., msclkid=...
+AD_CLICK_RE = "(^|&)(" + "|".join(AD_CLICK_PARAMS) + ")="
 
 HEADER_LINES = 3  # comment lines that carry the date; ignored by `n-antibot check`
 
@@ -21,6 +25,10 @@ class Blocklist:
     generated_on: str
     manual_block: tuple[str, ...] = ()
     manual_allow: tuple[str, ...] = ()
+    # Data-center networks whose PAID AD CLICKS are cut (only filled when `[ads] cut = true`).
+    ads_v4: tuple[str, ...] = ()
+    ads_v6: tuple[str, ...] = ()
+    ads_asns: tuple[str, ...] = ()
 
 
 def _header(c: str, bl: Blocklist, where: str) -> list[str]:
@@ -56,10 +64,22 @@ def caddy(bl: Blocklist, cfg: Config) -> str:
             lines.append(f"\tnot path {excl}")
         lines.append(f'\theader_regexp {p}Ua User-Agent "(?i){_alt(bl.agents)}"')
         lines.append("}")
+    ads = [*bl.ads_v4, *bl.ads_v6]
+    if ads:
+        # Data-center networks are only cut when the request is a paid ad click (it carries a click identifier).
+        lines.append(f"@{p}AdClick {{")
+        if excl:
+            lines.append(f"\tnot path {excl}")
+        lines.append(f"\texpression {{http.request.uri.query}}.matches('{AD_CLICK_RE}')")
+        for i in range(0, len(ads), 8):
+            lines.append(f"\t{cfg.caddy_ip_matcher} " + " ".join(ads[i : i + 8]))
+        lines.append("}")
     if ranges:
         lines.append(f"rewrite @{p}Net {dest}")
     if bl.agents:
         lines.append(f"rewrite @{p}Agent {dest}")
+    if ads:
+        lines.append(f"rewrite @{p}AdClick {dest}")
     lines += [f"handle {dest} {{", "\tabort", "}", ""]
     return "\n".join(lines)
 
@@ -84,13 +104,33 @@ def nginx(bl: Blocklist, cfg: Config) -> str:
         lines.append(f'\t"~*{_alt(bl.agents)}" 1;')
     lines += ["}", f"map $uri ${p}_excluded {{", "\tdefault 0;"]
     lines += [f'\t"{_nginx_path(x)}" 1;' for x in cfg.exclude_paths]
+    ads = [*bl.ads_v4, *bl.ads_v6]
+    if not ads:
+        lines += [
+            "}",
+            f'map "${p}_net${p}_agent${p}_excluded" ${p}_block {{',
+            "\tdefault 0;",
+            '\t"100" 1;',
+            '\t"010" 1;',
+            '\t"110" 1;',
+            "}",
+            "",
+        ]
+        return "\n".join(lines)
+    # Data-center networks are only cut when the request is a paid ad click (it carries a click identifier).
+    lines += ["}", f"geo ${p}_adnet {{", "\tdefault 0;"]
+    lines += [f"\t{r} 1;" for r in ads]
     lines += [
         "}",
-        f'map "${p}_net${p}_agent${p}_excluded" ${p}_block {{',
+        f"map $args ${p}_adclick {{",
         "\tdefault 0;",
-        '\t"100" 1;',
-        '\t"010" 1;',
-        '\t"110" 1;',
+        f'\t"~{AD_CLICK_RE}" 1;',
+        "}",
+        f'map "${p}_net${p}_agent${p}_excluded${p}_adnet${p}_adclick" ${p}_block {{',
+        "\tdefault 0;",
+        '\t"~^1.0" 1;',
+        '\t"~^.10" 1;',
+        '\t"~^..011$" 1;',
         "}",
         "",
     ]
@@ -131,7 +171,21 @@ def apache(bl: Blocklist, cfg: Config) -> str:
             lines.append(cond + ("]" if last else ",OR]"))
         else:
             lines.append(cond[:-2] if last else cond + "OR]")
-    lines += ["RewriteRule ^ - [F,L]", ""]
+    if ors:
+        lines.append("RewriteRule ^ - [F,L]")
+    else:
+        lines = [x for x in lines if not x.startswith("RewriteCond")]
+    ads = [*bl.ads_v4, *bl.ads_v6]
+    if ads:
+        # Data-center networks are only cut when the request is a paid ad click (it carries a click identifier).
+        lines += [f'RewriteCond %{{REQUEST_URI}} "!{_regex_path(x)}"' for x in cfg.exclude_paths]
+        lines.append(f'RewriteCond %{{QUERY_STRING}} "{AD_CLICK_RE}"')
+        chunks = [ads[i : i + 8] for i in range(0, len(ads), 8)]
+        for i, chunk in enumerate(chunks):
+            cond = 'RewriteCond expr "' + " || ".join(f"-R '{r}'" for r in chunk) + '"'
+            lines.append(cond if i == len(chunks) - 1 else cond + " [OR]")
+        lines.append("RewriteRule ^ - [F,L]")
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -189,6 +243,10 @@ def cloudflare(bl: Blocklist, cfg: Config) -> str:
     if bl.manual_block:
         block.append("ip.src in {" + " ".join(bl.manual_block) + "}")
     block += [f'lower(http.user_agent) contains "{a.lower()}"' for a in bl.agents]
+    if bl.ads_asns:
+        # Data-center networks are only cut when the request is a paid ad click (it carries a click identifier).
+        click = " or ".join(f'http.request.uri.query contains "{name}="' for name in AD_CLICK_PARAMS)
+        block.append("(ip.src.asnum in {" + " ".join(a[2:] for a in bl.ads_asns) + "} and (" + click + "))")
     expr = "(" + " or ".join(block) + ")"
     if bl.manual_allow:
         expr += " and not ip.src in {" + " ".join(bl.manual_allow) + "}"
@@ -213,6 +271,13 @@ def as_json(bl: Blocklist, cfg: Config) -> str:
                 "user_agents": list(bl.agents),
                 "user_agent_regex": "(?i)" + _alt(bl.agents) if bl.agents else None,
                 "exclude_paths": list(cfg.exclude_paths),
+                "ad_clicks": {
+                    "cut": bool(bl.ads_v4 or bl.ads_v6),
+                    "params": list(AD_CLICK_PARAMS),
+                    "asns": list(bl.ads_asns),
+                    "ipv4": list(bl.ads_v4),
+                    "ipv6": list(bl.ads_v6),
+                },
             },
             indent=2,
         )

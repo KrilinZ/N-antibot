@@ -55,6 +55,25 @@ test('agents and excluded paths', () => {
   assert.equal(m.check({ ip: '43.173.1.1', userAgent: CHROME, path: '/api/x' }).blocked, false);
 });
 
+test('paid ad clicks from data centers, only when the data asks for it', () => {
+  const withAds = {
+    ...data,
+    ad_clicks: { cut: true, params: ['gclid', 'msclkid'], ipv4: ['3.0.0.0/9'], ipv6: ['2600:1f00::/24'] },
+  };
+  const m = createMatcher(withAds);
+  const hit = (ip, path) => m.check({ ip, userAgent: CHROME, path });
+  assert.deepEqual(hit('3.5.5.5', '/?gclid=abc'), { blocked: true, reason: 'ad-click', match: '3.0.0.0/9' });
+  assert.equal(hit('2600:1f00::1', '/p/?x=1&msclkid=abc').blocked, true);
+  assert.equal(hit('3.5.5.5', '/').blocked, false); // that cloud is not blocked for normal browsing
+  assert.equal(hit('3.5.5.5', '/?notgclid=abc').blocked, false);
+  assert.equal(hit('3.5.5.5', '/?gclid=').blocked, false);
+  assert.equal(hit('3.5.5.5', '/api/hook?gclid=abc').blocked, false); // excluded path
+  assert.equal(hit('81.40.1.1', '/?gclid=abc').blocked, false); // a real visitor's ad click
+  assert.equal(createMatcher(data).check({ ip: '3.5.5.5', userAgent: CHROME, path: '/?gclid=abc' }).blocked, false);
+  const off = createMatcher({ ...withAds, ad_clicks: { ...withAds.ad_clicks, cut: false } });
+  assert.equal(off.check({ ip: '3.5.5.5', userAgent: CHROME, path: '/?gclid=abc' }).blocked, false);
+});
+
 test('rejects data that is not n-antibot JSON', () => {
   assert.throws(() => createMatcher({}), /n-antibot generate -f json/);
   assert.throws(() => createMatcher({ ipv4: ['x/8'], ipv6: [], user_agents: [] }), /invalid range/);

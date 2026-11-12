@@ -43,3 +43,11 @@ prefix = "n_antibot"
 # Name of the table and the ports it protects (TCP and UDP).
 table = "n_antibot"
 ports = [80, 443]
+
+[ads]
+# Data-center networks whose PAID AD CLICKS count as bots in the report (default: every built-in network).
+# networks = ["aws", "google-cloud", "ovh", "hetzner"]
+# Extra server networks for the same purpose.
+asns = []
+# true: also cut those ad clicks at the server. The rest of the traffic from those networks keeps getting in.
+cut = false

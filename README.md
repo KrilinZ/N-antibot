@@ -161,6 +161,7 @@ Caddy, nginx, Apache y `.htaccess`, el cortafuegos de Linux, Cloudflare, Node.js
 
 **Usar**
 
+- [Bots de anuncios](#-bots-de-anuncios)
 - [Informe: bots y clics de anuncios](#-informe-bots-y-clics-de-anuncios)
 - [Dónde reclamar los clics fraudulentos](#-dónde-reclamar-los-clics-fraudulentos)
 - [API de datos](#-api-de-datos)
@@ -235,6 +236,7 @@ como PerimeterX; N-antibot no los ve, y lo dice en [sus límites](#-límites-lo-
 |---|:---:|---|
 | Tencent Cloud (AS132203, AS45090) | ⛔ cortada | `[networks] presets` |
 | Alibaba Cloud, Huawei Cloud | ✅ pasa | añade `alibaba-cloud`, `huawei-cloud` |
+| Clics de anuncios desde centros de datos (Amazon, Google Cloud, OVH, Hetzner y otras nueve nubes) | ✅ pasa, y el informe lo cuenta como bot | `[ads] cut = true` los corta |
 | Cualquier otra red (por ASN o por rango) | ✅ pasa | `[networks] asns` y `block` |
 | Bytespider, MJ12bot, DotBot, BLEXBot, PetalBot, MegaIndex, SeekportBot | ⛔ cortada | `[robots] presets` / `allow` |
 | python-requests, python-urllib, Go-http-client, Scrapy, aiohttp, libwww-perl | ⛔ cortada | `[robots] allow` |
@@ -293,6 +295,36 @@ handle /__n_antibot_blocked {
 Las pruebas arrancan un Caddy real con `handle /product/*` y comprueban que el corte llega también ahí.
 </details>
 
+## 🎯 Bots de anuncios
+
+Los bots que hacen clic en tus anuncios suelen salir de servidores en la nube, no de casas. N-antibot los trata en
+tres niveles:
+
+| Nivel | Qué hace | Cómo |
+|---|---|---|
+| **1. Contarlos** (siempre) | El informe marca como bot todo clic de pago que venga de un centro de datos: Amazon, Google Cloud, OVH, Hetzner, DigitalOcean y ocho nubes más. Aunque esa nube no esté bloqueada. | `n-antibot report` |
+| **2. Reclamarlos** | Un expediente por plataforma con lo que pide cada una. | `n-antibot report --claim-dir` |
+| **3. Cortarlos** (opcional) | El servidor corta **solo los clics de anuncios** que vengan de esas nubes. El resto del tráfico de esas redes sigue pasando. | `[ads] cut = true` |
+
+```toml
+[ads]
+cut = true                      # corta en el servidor los clics de pago que vengan de centros de datos
+networks = ["aws", "ovh"]       # opcional: por defecto, todas las nubes incluidas
+asns = ["AS64500"]              # opcional: otras redes de servidores
+```
+
+Un clic de anuncio se reconoce por su identificador en la dirección: `gclid`, `gbraid`, `wbraid`, `msclkid`,
+`ttclid`, `twclid` o `li_fat_id`.
+
+> [!WARNING]
+> **Cortar no evita el cobro**: el clic ya ocurrió en la plataforma. Cortarlo sirve para que ese bot no cuente como
+> visita, no dispare conversiones falsas ni entre en tus públicos de remarketing. El dinero se recupera reclamando.
+> Y tiene un coste: una persona real que navegue con una VPN alojada en una de esas nubes vería la página cortada
+> después de haber pagado tú su clic. Por eso viene desactivado.
+
+Medido en Caddy con todas las nubes cargadas (unos 12.700 rangos): una petición normal tarda lo mismo con la regla
+que sin ella (0,06 ms), y un clic de anuncio, 0,05 ms más.
+
 ## 📊 Informe: bots y clics de anuncios
 
 `n-antibot report` lee los registros de acceso de tu servidor (Caddy, nginx o Apache) y te dice cuántas visitas son
@@ -307,7 +339,7 @@ Bots
     served:   1   <- N-antibot is not stopping these yet
 Paid ad clicks
   google: 4 clicks
-    bots:        3 (75.0%)  [network 2, robot 1]
+    bots:        3 (75.0%)  [blocked network 2, robot 1, data center 0]
     suspicious:  0 (0.0%)  [repeated IP 0, no resources 0]
     clean:       1
   ...
@@ -424,7 +456,7 @@ O aislado, con [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.6.0`.
+Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.7.0`.
 
 ### 🟦 Instalación en Caddy
 
@@ -574,7 +606,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.6.0",
+  "generator": "n-antibot 0.7.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -618,6 +650,9 @@ prefix = "n_antibot"
 [nftables]
 table = "n_antibot"
 ports = [80, 443]
+
+[ads]
+cut = false                      # true: corta los clics de anuncios que vengan de centros de datos
 ```
 
 ### Referencia completa
@@ -639,6 +674,9 @@ ports = [80, 443]
 | `nginx.prefix` | texto | `"n_antibot"` | Prefijo de las variables de nginx. |
 | `nftables.table` | texto | `"n_antibot"` | Nombre de la tabla del cortafuegos. |
 | `nftables.ports` | lista de números | `[80, 443]` | Puertos protegidos (TCP y UDP). |
+| `ads.networks` | lista | todas las redes incluidas | Nubes cuyos clics de anuncios cuentan como bot en el informe. |
+| `ads.asns` | lista | `[]` | Otros ASN de servidores para lo mismo. |
+| `ads.cut` | sí/no | `false` | Cortar en el servidor los clics de anuncios que vengan de esas redes. No vale con `nftables`. |
 
 ### Validaciones que te protegen
 
@@ -669,6 +707,23 @@ Míralas en cualquier momento con `n-antibot presets`.
 | `tencent-cloud` | ✅ | AS132203, AS45090 | Tencent Cloud internacional y China. Origen habitual de bots que imitan a Chrome. |
 | `alibaba-cloud` | | AS45102 | Alibaba Cloud. |
 | `huawei-cloud` | | AS136907 | Huawei Cloud. |
+| `aws` | | AS16509, AS14618 | Amazon Web Services. |
+| `google-cloud` | | AS396982 | Google Cloud. No es la red propia de Google: Googlebot no sale de aquí. |
+| `digitalocean` | | AS14061 | DigitalOcean. |
+| `ovh` | | AS16276 | OVHcloud. |
+| `hetzner` | | AS24940 | Hetzner. |
+| `linode` | | AS63949 | Akamai Connected Cloud (antes Linode). |
+| `vultr` | | AS20473 | Vultr. |
+| `oracle-cloud` | | AS31898 | Oracle Cloud. |
+| `contabo` | | AS51167 | Contabo. |
+| `scaleway` | | AS12876 | Scaleway. |
+
+Las diez últimas son grandes: solo Amazon anuncia miles de rangos. Bloquearlas para todo el tráfico puede cortar
+servicios legítimos alojados ahí (monitores, vistas previas de enlaces, integraciones). Por eso no van por defecto:
+su uso normal es juzgar **solo los clics de anuncios**, que es lo que hace `[ads]`.
+
+No hay lista para las redes de Google (AS15169), Microsoft (AS8075), Cloudflare, Akamai ni Fastly, a propósito: de
+ahí salen Googlebot, Bingbot y los relés de privacidad que usan personas reales.
 
 ### Robots
 

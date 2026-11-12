@@ -36,11 +36,11 @@ Bots
 
 Paid ad clicks
   google: 4 clicks
-    bots:        3 (75.0%)  [network 2, robot 1]
+    bots:        3 (75.0%)  [blocked network 2, robot 1, data center 0]
     suspicious:  0 (0.0%)  [repeated IP 0, no resources 0]
     clean:       1
   microsoft: 1 clicks
-    bots:        0 (0.0%)  [network 0, robot 0]
+    bots:        0 (0.0%)  [blocked network 0, robot 0, data center 0]
     suspicious:  1 (100.0%)  [repeated IP 0, no resources 1]
     clean:       0
 
@@ -103,6 +103,7 @@ to every link, paid or not.
 | Verdict | Reason | What it means | Reliability |
 |---|---|---|---|
 | **bot** | `from a blocked network` | The IP belongs to a server network you block (with its ASN and range). | High: people do not browse from a data center |
+| **bot** | `from a data-center network` | The click comes from a cloud (Amazon, Google Cloud, OVH, Hetzner…) even if you do not block it. | High, not absolute: a person on a VPN hosted there would be a false positive |
 | **bot** | `blocked robot or scraper` | The browser identifies itself as a robot or a scraping library. | High |
 | **suspicious** | `same IP clicked several ads` | The same IP made 3 or more different ad clicks in the period. | Hint |
 | **suspicious** | `loaded no page resources` | That IP only requested the page: no images, styles or scripts. A real browser requests them. | Hint |

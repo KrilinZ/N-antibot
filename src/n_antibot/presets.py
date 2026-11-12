@@ -29,8 +29,27 @@ NETWORK_PRESETS: dict[str, Preset] = {
         ),
         Preset("alibaba-cloud", "Alibaba Cloud (AS45102).", ("AS45102",)),
         Preset("huawei-cloud", "Huawei Cloud (AS136907).", ("AS136907",)),
+        Preset("aws", "Amazon Web Services (AS16509, AS14618).", ("AS16509", "AS14618")),
+        Preset(
+            "google-cloud", "Google Cloud (AS396982). Not Google's own network: Googlebot is not here.", ("AS396982",)
+        ),
+        Preset("digitalocean", "DigitalOcean (AS14061).", ("AS14061",)),
+        Preset("ovh", "OVHcloud (AS16276).", ("AS16276",)),
+        Preset("hetzner", "Hetzner (AS24940).", ("AS24940",)),
+        Preset("linode", "Akamai Connected Cloud, formerly Linode (AS63949).", ("AS63949",)),
+        Preset("vultr", "Vultr (AS20473).", ("AS20473",)),
+        Preset("oracle-cloud", "Oracle Cloud (AS31898).", ("AS31898",)),
+        Preset("contabo", "Contabo (AS51167).", ("AS51167",)),
+        Preset("scaleway", "Scaleway (AS12876).", ("AS12876",)),
     ]
 }
+
+# Never offered as presets, on purpose: real people browse from these networks.
+#   AS15169 Google and AS8075 Microsoft: Googlebot and Bingbot live there.
+#   AS13335 Cloudflare, AS36183 Akamai and AS54113 Fastly: iCloud Private Relay and similar privacy relays exit there.
+
+# Click identifiers that ad platforms append to the landing URL.
+AD_CLICK_PARAMS: tuple[str, ...] = ("gclid", "gbraid", "wbraid", "msclkid", "ttclid", "twclid", "li_fat_id")
 
 # User-agent fragments. Matched case-insensitively anywhere in the User-Agent header.
 ROBOT_PRESETS: dict[str, Preset] = {

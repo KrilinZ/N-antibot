@@ -21,7 +21,7 @@
 <text x="26" y="348" fill="#58a6ff">n-antibot: installed: example.com is protected</text>
 <text x="26" y="392"><tspan fill="#3fb950" font-weight="700">$ </tspan><tspan fill="#e6edf3" font-weight="600">n-antibot report /var/log/caddy/access.log --claim-dir claim/</tspan></text>
 <text x="26" y="414" fill="#c9d1d9">  google: 5 clicks</text>
-<text x="26" y="436" fill="#d29922">    bots:        4 (80.0%)  [network 3, robot 1]</text>
+<text x="26" y="436" fill="#d29922">    bots:        4 (80.0%)  [blocked network 3, robot 1, data center 0]</text>
 <text x="26" y="458" fill="#8b949e">n-antibot: Google Ads: 4 clicks (4 within the deadline) -&gt; claim/google-claim.txt</text>
 </g>
 </svg>

@@ -110,7 +110,7 @@ Parámetros: `since`, `until`.
 | `bots.cut_off` | Las que se cortaron (estado `0` en Caddy, `444` en nginx, `403` en Apache). |
 | `bots.served` | Las que recibieron respuesta. Si no es `0`, el freno no está instalado o no está al día. |
 | `bots.by` | Reparto por red (con su ASN) y por robot. |
-| `ad_clicks.<plataforma>` | Clics de pago: `total`, `network` y `agent` (bots), `repeated` y `no-resources` (sospechosos), `clean`. |
+| `ad_clicks.<plataforma>` | Clics de pago: `total`, `network`, `agent` y `datacenter` (bots), `repeated` y `no-resources` (sospechosos), `clean`. |
 | `top_unblocked` | Los visitantes con más peticiones que no están bloqueados, con cuántos recursos (imágenes, estilos) pidieron. |
 
 ### `GET /v1/bots`

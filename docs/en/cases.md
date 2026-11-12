@@ -143,6 +143,24 @@ presets = ["aggressive-crawlers", "scraping-libraries", "vulnerability-scanners"
 block = ["PerplexityBot"]       # add any other by name
 ```
 
+## 🎯 Protecting ad campaigns
+
+**Problem:** bots clicking your ads from cloud servers. They burn budget and also pollute your visits, conversions
+and remarketing audiences.
+
+**Watch out for:** cutting the click does not avoid the charge, and a real person on a VPN hosted in those clouds
+would see the page cut off. The report always counts them; cutting them is optional.
+
+[`ad-campaigns.toml`](../../examples/cases/ad-campaigns.toml)
+
+```toml
+[ads]
+cut = true
+```
+
+Then get the claim files: `n-antibot report /var/log/nginx/access.log* --claim-dir claim/`. See the
+[ad report](ads-report.md).
+
 ## 🧱 Cutting before the web server
 
 **Problem:** you want those networks not to reach any web service on the machine, whatever you have installed

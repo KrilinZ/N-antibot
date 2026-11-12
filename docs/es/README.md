@@ -58,6 +58,7 @@ dónde reclamarlos. ✅ Probada con el servidor real. [Especificación OpenAPI](
 | [Detrás de un CDN o balanceador](casos.md#-detrás-de-un-cdn-o-balanceador) | [`behind-cdn.toml`](../../examples/cases/behind-cdn.toml) |
 | [Protección máxima](casos.md#-protección-máxima) | [`strict.toml`](../../examples/cases/strict.toml) |
 | [Sin robots de IA](casos.md#-sin-robots-de-ia) | [`no-ai.toml`](../../examples/cases/no-ai.toml) |
+| [Proteger las campañas de anuncios](casos.md#-proteger-las-campañas-de-anuncios) | [`ad-campaigns.toml`](../../examples/cases/ad-campaigns.toml) |
 | [Cortar antes del servidor web](casos.md#-cortar-antes-del-servidor-web) | [`firewall.toml`](../../examples/cases/firewall.toml) |
 | [Varias webs en un servidor](casos.md#-varias-webs-en-un-servidor) | |
 | [Me atacan desde otra red](casos.md#-me-atacan-desde-otra-red) | |

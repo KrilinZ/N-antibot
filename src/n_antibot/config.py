@@ -45,6 +45,10 @@ class Config:
     nginx_prefix: str = "n_antibot"
     nftables_table: str = "n_antibot"
     nftables_ports: tuple[int, ...] = (80, 443)
+    # Data-center networks used to judge PAID AD CLICKS only (the report always uses them; `ads_cut` also cuts them).
+    ads_presets: tuple[str, ...] = field(default_factory=lambda: tuple(NETWORK_PRESETS))
+    ads_asns: tuple[str, ...] = ()
+    ads_cut: bool = False
 
     # ---- derived lists -------------------------------------------------------------------------------------------
     def all_asns(self) -> tuple[str, ...]:
@@ -53,6 +57,15 @@ class Config:
             out += NETWORK_PRESETS[name].members
         out += self.asns
         return tuple(dict.fromkeys(a.upper() for a in out))
+
+    def ads_asn_list(self) -> tuple[str, ...]:
+        """ASNs whose ad clicks count as bots: the ads lists, minus the networks that are blocked for everything."""
+        out: list[str] = []
+        for name in self.ads_presets:
+            out += NETWORK_PRESETS[name].members
+        out += self.ads_asns
+        blocked = set(self.all_asns())
+        return tuple(dict.fromkeys(a.upper() for a in out if a.upper() not in blocked))
 
     def agents(self) -> tuple[str, ...]:
         out: list[str] = []
@@ -78,6 +91,14 @@ class Config:
         for a in self.asns:
             if not ASN_RE.match(a.upper()):
                 raise ConfigError(f"networks.asns: {a!r} is not an ASN like 'AS132203'")
+        for name in self.ads_presets:
+            if name not in NETWORK_PRESETS:
+                raise ConfigError(f"ads.networks: unknown preset {name!r} (known: {', '.join(NETWORK_PRESETS)})")
+        for a in self.ads_asns:
+            if not ASN_RE.match(a.upper()):
+                raise ConfigError(f"ads.asns: {a!r} is not an ASN like 'AS16509'")
+        if self.ads_cut and self.format == "nftables":
+            raise ConfigError("ads.cut needs the URL of the request: a firewall (nftables) cannot see it")
         for key, cidrs in (("networks.block", self.block_cidrs), ("networks.allow", self.allow_cidrs)):
             for c in cidrs:
                 try:
@@ -109,7 +130,8 @@ class Config:
             raise ConfigError(f"caddy.block_path: {self.caddy_block_path!r} must look like '/__n_antibot_blocked'")
         if self.caddy_ip_matcher not in ("remote_ip", "client_ip"):
             raise ConfigError("caddy.ip_matcher must be 'remote_ip' or 'client_ip'")
-        if not self.all_asns() and not self.block_cidrs and not self.agents():
+        nothing = not self.all_asns() and not self.block_cidrs and not self.agents()
+        if nothing and not (self.ads_cut and self.ads_asn_list()):
             raise ConfigError("nothing to block: every network and robot list is empty")
         for ua in PROTECTED_AGENTS:
             hit = self.blocks_agent(ua)
@@ -126,9 +148,11 @@ _SCHEMA: dict[str, dict[str, str]] = {
     "caddy": {"prefix": "caddy_prefix", "block_path": "caddy_block_path", "ip_matcher": "caddy_ip_matcher"},
     "nginx": {"prefix": "nginx_prefix"},
     "nftables": {"table": "nftables_table", "ports": "nftables_ports"},
+    "ads": {"networks": "ads_presets", "asns": "ads_asns", "cut": "ads_cut"},
 }
 _STRINGS = {"format", "caddy_prefix", "caddy_block_path", "caddy_ip_matcher", "nginx_prefix", "nftables_table"}
 _INTS = {"nftables_ports"}
+_BOOLS = {"ads_cut"}
 
 
 def from_dict(data: dict[str, Any]) -> Config:
@@ -146,6 +170,10 @@ def from_dict(data: dict[str, Any]) -> Config:
             if attr in _STRINGS:
                 if not isinstance(value, str):
                     raise ConfigError(f"{section}.{key} must be a string")
+                values[attr] = value
+            elif attr in _BOOLS:
+                if not isinstance(value, bool):
+                    raise ConfigError(f"{section}.{key} must be true or false")
                 values[attr] = value
             elif attr in _INTS:
                 if not isinstance(value, list) or not all(type(v) is int for v in value):

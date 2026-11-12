@@ -1,0 +1,8 @@
+# Protect paid campaigns: cut at the server the ad clicks that come from data centers, and nothing else from them.
+# Cutting does not avoid the charge (the click already happened): it keeps bots out of your visits, conversions and
+# remarketing audiences. Claim the money with: n-antibot report LOG --claim-dir claim/
+[ads]
+cut = true
+
+[paths]
+exclude = ["/.well-known/*", "/api/*", "/webhooks/*"]

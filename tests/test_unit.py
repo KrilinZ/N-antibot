@@ -329,7 +329,7 @@ def test_every_example_case_is_a_valid_configuration():
     from n_antibot import load
 
     cases = sorted((Path(__file__).parent.parent / "examples" / "cases").glob("*.toml"))
-    assert len(cases) >= 8
+    assert len(cases) >= 9
     for case in cases:
         cfg = load(case)
         assert generate(cfg, fetch=fake_fetch, today="2026-11-12"), case.name
@@ -353,3 +353,77 @@ def test_cli_messages_are_plain_ascii(tmp_path, monkeypatch, capsys):
     assert main(["check", "-o", str(tmp_path / "x.caddy")]) == 0
     out = capsys.readouterr()
     assert (out.out + out.err).isascii()
+
+
+# ---------------------------------------------------------------- [ads] cut = true
+def ads_gen(fmt, **ads):
+    cfg = from_dict({"output": {"format": fmt}, "ads": {"networks": ["aws", "hetzner"], "cut": True, **ads}})
+    calls = []
+
+    def fetch(asns, **_):
+        calls.append(tuple(asns))
+        return {
+            "AS132203": ["43.172.0.0/16"],
+            "AS16509": ["3.0.0.0/9", "2600:1f00::/24"],
+            "AS24940": ["5.9.0.0/16"],
+        }.get(asns[0], ["198.51.100.0/24"]) + (["5.9.0.0/16"] if "AS24940" in asns and asns[0] != "AS24940" else [])
+
+    return generate(cfg, fetch=fetch, today="2026-11-12"), calls
+
+
+def test_ads_cut_is_off_by_default_and_leaves_every_output_unchanged():
+    assert Config().ads_cut is False
+    for fmt in ("caddy", "nginx", "apache", "cloudflare"):
+        text = gen(output={"format": fmt})
+        assert "gclid" not in text and "AdClick" not in text and "adnet" not in text, fmt
+    assert json.loads(gen(output={"format": "json"}))["ad_clicks"]["cut"] is False
+
+
+def test_ads_cut_rules_in_each_output():
+    caddy, calls = ads_gen("caddy")
+    assert calls[1] == ("AS16509", "AS14618", "AS24940")  # the ads networks, fetched apart from the blocked ones
+    assert "@nAntibotAdClick {" in caddy and "rewrite @nAntibotAdClick /__n_antibot_blocked" in caddy
+    assert (
+        "expression {http.request.uri.query}.matches('(^|&)(gclid|gbraid|wbraid|msclkid|ttclid|twclid|li_fat_id)=')"
+        in caddy
+    )
+    block = caddy[caddy.index("@nAntibotAdClick") : caddy.index("rewrite @nAntibotNet")]
+    assert "3.0.0.0/9" in block and "5.9.0.0/16" in block and "43.172.0.0/16" not in block
+    assert caddy.count("{") == caddy.count("}")
+    nginx, _ = ads_gen("nginx")
+    assert "geo $n_antibot_adnet {" in nginx and "map $args $n_antibot_adclick {" in nginx
+    assert (
+        'map "$n_antibot_net$n_antibot_agent$n_antibot_excluded$n_antibot_adnet$n_antibot_adclick" $n_antibot_block {'
+        in nginx
+    )
+    assert '"~^..011$" 1;' in nginx and '"100" 1;' not in nginx
+    apache, _ = ads_gen("apache")
+    assert apache.count("RewriteRule ^ - [F,L]") == 2
+    assert 'RewriteCond %{QUERY_STRING} "(^|&)(gclid|gbraid|wbraid|msclkid|ttclid|twclid|li_fat_id)="' in apache
+    cf, calls = ads_gen("cloudflare")
+    assert calls == []  # by ASN: nothing is downloaded
+    expr = cf.rstrip("\n").splitlines()[-1]
+    assert '(ip.src.asnum in {16509 14618 24940} and (http.request.uri.query contains "gclid=" or ' in expr
+    assert expr.count("(") == expr.count(")") and len(expr) < 4096
+    data = json.loads(ads_gen("json")[0])["ad_clicks"]
+    assert data["cut"] is True and "3.0.0.0/9" in data["ipv4"] and data["ipv6"] == ["2600:1f00::/24"]
+    assert data["params"][0] == "gclid" and data["asns"] == ["AS16509", "AS14618", "AS24940"]
+
+
+def test_ads_configuration_is_validated():
+    assert (
+        len(Config().ads_asn_list()) == 13 and "AS132203" not in Config().ads_asn_list()
+    )  # blocked ones are not repeated
+    assert from_dict({"networks": {"presets": ["aws"]}, "ads": {"networks": ["aws", "ovh"]}}).ads_asn_list() == (
+        "AS16276",
+    )
+    for data, msg in [
+        ({"ads": {"networks": ["nope"]}}, "ads.networks: unknown preset"),
+        ({"ads": {"asns": ["16509"]}}, "ads.asns"),
+        ({"ads": {"cut": "yes"}}, "must be true or false"),
+        ({"ads": {"cut": True}, "output": {"format": "nftables"}}, "cannot see it"),
+    ]:
+        with pytest.raises(ConfigError, match=msg):
+            from_dict(data)
+    only_ads = from_dict({"networks": {"presets": []}, "robots": {"presets": []}, "ads": {"cut": True}})
+    assert only_ads.ads_cut  # cutting only ad clicks is a valid configuration

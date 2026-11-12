@@ -160,11 +160,10 @@ def ad_fields(uri: str) -> dict[str, str]:
     }
 
 
-class Classifier:
-    """Says whether a visitor is a bot according to a configuration: by network (with its ASN) or by User-Agent."""
+class _Ranges:
+    """Labelled IP ranges with exact lookup by bisection."""
 
-    def __init__(self, cfg: Config, labelled: Iterable[tuple[str, str]], allow: Iterable[str] = ()):
-        self.cfg = cfg
+    def __init__(self, labelled: Iterable[tuple[str, str]]):
         by_label: dict[str, list[Any]] = defaultdict(list)
         for label, prefix in labelled:
             by_label[label].append(ipaddress.ip_network(prefix.strip(), strict=False))
@@ -180,24 +179,52 @@ class Classifier:
                 if not self._v[version] or row[0] > self._v[version][-1][1]:
                     self._v[version].append(row)
         self._starts = {v: [r[0] for r in found] for v, found in self._v.items()}
+
+    def find(self, addr: Any) -> str | None:
+        rows, value = self._v[addr.version], int(addr)
+        i = bisect.bisect_right(self._starts[addr.version], value) - 1
+        return rows[i][2] if i >= 0 and rows[i][1] >= value else None
+
+
+class Classifier:
+    """Says whether a visitor is a bot according to a configuration: by network (with its ASN) or by User-Agent.
+
+    `labelled` are the networks blocked for every request. `datacenters` are networks that are not blocked but
+    that no real customer browses from: they only count against paid ad clicks.
+    """
+
+    def __init__(
+        self,
+        cfg: Config,
+        labelled: Iterable[tuple[str, str]],
+        allow: Iterable[str] = (),
+        datacenters: Iterable[tuple[str, str]] = (),
+    ):
+        self.cfg = cfg
+        self._blocked = _Ranges(labelled)
+        self._datacenters = _Ranges(datacenters)
         self._allow = [ipaddress.ip_network(a, strict=False) for a in allow]
-        self._cache: dict[str, str | None] = {}
+        self._cache: dict[str, tuple[str | None, str | None]] = {}
 
     @classmethod
     def from_config(cls, cfg: Config, fetch_asn: Callable[[str], list[str]] | None = None) -> Classifier:
-        fetch_asn = fetch_asn or ranges.fetch_asn
+        fetch_asn = fetch_asn or ranges.fetch_asn_cached
         names = {asn: p.name for p in NETWORK_PRESETS.values() for asn in p.members}
-        labelled: list[tuple[str, str]] = []
-        for asn in cfg.all_asns():
-            label = f"{asn} ({names[asn]})" if asn in names else asn
-            labelled += [(label, prefix) for prefix in fetch_asn(asn)]
-        labelled += [("manual", c) for c in cfg.block_cidrs]
-        return cls(cfg, labelled, cfg.allow_cidrs)
 
-    def network(self, ip: str) -> str | None:
+        def labelled(asns: Iterable[str]) -> list[tuple[str, str]]:
+            out: list[tuple[str, str]] = []
+            for asn in asns:
+                label = f"{asn} ({names[asn]})" if asn in names else asn
+                out += [(label, prefix) for prefix in fetch_asn(asn)]
+            return out
+
+        blocked = labelled(cfg.all_asns()) + [("manual", c) for c in cfg.block_cidrs]
+        return cls(cfg, blocked, cfg.allow_cidrs, labelled(cfg.ads_asn_list()))
+
+    def _lookup(self, ip: str) -> tuple[str | None, str | None]:
         if ip in self._cache:
             return self._cache[ip]
-        found = None
+        found: tuple[str | None, str | None] = (None, None)
         try:
             addr = ipaddress.ip_address(ip)
         except ValueError:
@@ -206,12 +233,17 @@ class Classifier:
             if addr.version == 6 and addr.ipv4_mapped:
                 addr = addr.ipv4_mapped
             if not any(addr.version == a.version and addr in a for a in self._allow):
-                rows, value = self._v[addr.version], int(addr)
-                i = bisect.bisect_right(self._starts[addr.version], value) - 1
-                if i >= 0 and rows[i][1] >= value:
-                    found = rows[i][2]
+                found = (self._blocked.find(addr), self._datacenters.find(addr))
         self._cache[ip] = found
         return found
+
+    def network(self, ip: str) -> str | None:
+        """The blocked range this address is in, with its ASN."""
+        return self._lookup(ip)[0]
+
+    def datacenter(self, ip: str) -> str | None:
+        """The data-center range (not blocked) this address is in, with its ASN."""
+        return self._lookup(ip)[1]
 
     def verdict(self, ip: str, ua: str) -> tuple[str, str] | None:
         """('network', 'AS132203 (tencent-cloud) 43.173.0.0/16') | ('agent', 'Bytespider') | None."""
@@ -321,6 +353,10 @@ def analyze(
             click = clicks[key]
             if verdict and not click.reason:
                 click.reason, click.detail = verdict
+            elif not click.reason:
+                cloud = classifier.datacenter(hit.ip)
+                if cloud:
+                    click.reason, click.detail = "datacenter", cloud
             click.cut = click.cut or (bool(verdict) and cut)
 
     # Hints for clicks that no list caught. They are indications, not proof.
@@ -345,9 +381,11 @@ def analyze(
     return rep
 
 
+BOT_REASONS = ("network", "agent", "datacenter")
 REASONS = {
     "network": "from a blocked network",
     "agent": "blocked robot or scraper",
+    "datacenter": "from a data-center network",
     "repeated": "same IP clicked several ads (hint)",
     "no-resources": "loaded no page resources (hint)",
 }
@@ -379,12 +417,13 @@ def render_text(rep: Report) -> str:
         out.append("  None found (no gclid, msclkid... or utm_medium=cpc in the logged URLs).")
     for platform in rep.platforms():
         c = rep.clicks_by(platform)
-        bots = c.get("network", 0) + c.get("agent", 0)
+        bots = c.get("network", 0) + c.get("agent", 0) + c.get("datacenter", 0)
         hints = c.get("repeated", 0) + c.get("no-resources", 0)
         out += [
             f"  {platform}: {c['total']} clicks",
             f"    bots:        {bots} ({_pct(bots, c['total'])})"
-            f"  [network {c.get('network', 0)}, robot {c.get('agent', 0)}]",
+            f"  [blocked network {c.get('network', 0)}, robot {c.get('agent', 0)},"
+            f" data center {c.get('datacenter', 0)}]",
             f"    suspicious:  {hints} ({_pct(hints, c['total'])})"
             f"  [repeated IP {c.get('repeated', 0)}, no resources {c.get('no-resources', 0)}]",
             f"    clean:       {c.get('clean', 0)}",
@@ -394,7 +433,7 @@ def render_text(rep: Report) -> str:
     for c in rep.clicks:
         if c.reason:
             flagged[c.first.ip] += 1
-            why.setdefault(c.first.ip, c.detail if c.reason in ("network", "agent") else REASONS[c.reason])
+            why.setdefault(c.first.ip, c.detail if c.reason in BOT_REASONS else REASONS[c.reason])
     if flagged:
         out += ["", "IP addresses behind bot and suspicious ad clicks (clicks, IP, why)"]
         for ip, n in flagged.most_common(15):
@@ -436,7 +475,7 @@ def write_csv(rep: Report, target: io.TextIOBase, *, include_clean: bool = False
     for c in rep.clicks:
         if not c.reason and not include_clean:
             continue
-        verdict = "bot" if c.reason in ("network", "agent") else ("suspicious" if c.reason else "clean")
+        verdict = click_verdict(c)
         ts = c.first.ts
         w.writerow(
             [
@@ -483,7 +522,7 @@ def as_dict(rep: Report) -> dict[str, Any]:
 
 
 def click_verdict(c: AdClick) -> str:
-    return "bot" if c.reason in ("network", "agent") else ("suspicious" if c.reason else "clean")
+    return "bot" if c.reason in BOT_REASONS else ("suspicious" if c.reason else "clean")
 
 
 def click_dict(c: AdClick) -> dict[str, Any]:

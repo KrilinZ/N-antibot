@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import os
 import random
 import time
 import urllib.request
 from collections.abc import Callable, Iterable
+from pathlib import Path
 from typing import Any, Union
 
 Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
@@ -104,3 +106,51 @@ def build(asn_prefixes: Iterable[str], block: Iterable[str], allow: Iterable[str
     v4, v6 = collapse([*asn_prefixes, *block])
     a4, a6 = collapse(allow)
     return [str(n) for n in subtract(v4, a4)], [str(n) for n in subtract(v6, a6)]
+
+
+# ---- a small on-disk cache, for the commands that read many networks (report, serve) ---------------------------
+def cache_dir() -> Path | None:
+    """Where downloaded ranges are kept. N_ANTIBOT_CACHE=off disables it; any other value is the folder to use."""
+    value = os.environ.get("N_ANTIBOT_CACHE", "")
+    if value.lower() == "off":
+        return None
+    if value:
+        return Path(value)
+    return Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "n-antibot"
+
+
+def fetch_asn_cached(asn: str, *, ttl: float = 24 * 3600) -> list[str]:
+    """Prefixes of one ASN, from the cache when it is younger than `ttl` seconds.
+
+    If the download fails and an older copy exists, the older copy is used: a report with yesterday's ranges is
+    better than no report.
+    """
+    folder = cache_dir()
+    if folder is None:
+        return fetch_asn(asn)
+    path = folder / f"{asn.upper()}.json"
+    try:
+        if time.time() - path.stat().st_mtime < ttl:
+            cached = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(cached, list) and cached and all(isinstance(p, str) for p in cached):
+                return cached
+    except (OSError, ValueError):
+        pass
+    try:
+        fresh = fetch_asn(asn)
+    except FetchError:
+        try:
+            stale = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(stale, list) and stale:
+                return stale
+        except (OSError, ValueError):
+            pass
+        raise
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(fresh), encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        pass  # a read-only home is not a reason to fail
+    return fresh

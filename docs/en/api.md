@@ -110,7 +110,7 @@ Parameters: `since`, `until`.
 | `bots.cut_off` | Those that were cut off (status `0` in Caddy, `444` in nginx, `403` in Apache). |
 | `bots.served` | Those that got an answer. If it is not `0`, the block is not installed or not up to date. |
 | `bots.by` | Breakdown by network (with its ASN) and by robot. |
-| `ad_clicks.<platform>` | Paid clicks: `total`, `network` and `agent` (bots), `repeated` and `no-resources` (suspicious), `clean`. |
+| `ad_clicks.<platform>` | Paid clicks: `total`, `network`, `agent` and `datacenter` (bots), `repeated` and `no-resources` (suspicious), `clean`. |
 | `top_unblocked` | The busiest visitors that are not blocked, with how many resources (images, styles) they requested. |
 
 ### `GET /v1/bots`

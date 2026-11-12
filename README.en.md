@@ -161,6 +161,7 @@ Caddy, nginx, Apache and `.htaccess`, the Linux firewall, Cloudflare, Node.js an
 
 **Use**
 
+- [Ad bots](#-ad-bots)
 - [Report: bots and ad clicks](#-report-bots-and-ad-clicks)
 - [Where to claim fraudulent clicks](#-where-to-claim-fraudulent-clicks)
 - [Data API](#-data-api)
@@ -235,6 +236,7 @@ like PerimeterX; N-antibot does not see them, and says so in [its limits](#-limi
 |---|:---:|---|
 | Tencent Cloud (AS132203, AS45090) | ⛔ cut off | `[networks] presets` |
 | Alibaba Cloud, Huawei Cloud | ✅ allowed | add `alibaba-cloud`, `huawei-cloud` |
+| Ad clicks from data centers (Amazon, Google Cloud, OVH, Hetzner and nine more clouds) | ✅ allowed, and the report counts it as a bot | `[ads] cut = true` cuts them |
 | Any other network (by ASN or by range) | ✅ allowed | `[networks] asns` and `block` |
 | Bytespider, MJ12bot, DotBot, BLEXBot, PetalBot, MegaIndex, SeekportBot | ⛔ cut off | `[robots] presets` / `allow` |
 | python-requests, python-urllib, Go-http-client, Scrapy, aiohttp, libwww-perl | ⛔ cut off | `[robots] allow` |
@@ -292,6 +294,35 @@ handle /__n_antibot_blocked {
 The tests start a real Caddy with `handle /product/*` and check that the cut reaches it too.
 </details>
 
+## 🎯 Ad bots
+
+Bots that click your ads usually come from cloud servers, not homes. N-antibot deals with them at three levels:
+
+| Level | What it does | How |
+|---|---|---|
+| **1. Count them** (always) | The report flags as a bot every paid click coming from a data center: Amazon, Google Cloud, OVH, Hetzner, DigitalOcean and eight more clouds. Even if that cloud is not blocked. | `n-antibot report` |
+| **2. Claim them** | One file set per platform with what each one asks for. | `n-antibot report --claim-dir` |
+| **3. Cut them off** (optional) | The server cuts **only the ad clicks** coming from those clouds. The rest of the traffic from those networks keeps getting in. | `[ads] cut = true` |
+
+```toml
+[ads]
+cut = true                      # cut at the server the paid clicks coming from data centers
+networks = ["aws", "ovh"]       # optional: by default, every built-in cloud
+asns = ["AS64500"]              # optional: other server networks
+```
+
+An ad click is recognised by its identifier in the URL: `gclid`, `gbraid`, `wbraid`, `msclkid`, `ttclid`, `twclid`
+or `li_fat_id`.
+
+> [!WARNING]
+> **Cutting does not avoid the charge**: the click already happened at the platform. Cutting it keeps that bot from
+> counting as a visit, firing fake conversions or entering your remarketing audiences. The money is recovered by
+> claiming. And it has a cost: a real person browsing through a VPN hosted in one of those clouds would see the page
+> cut off after you paid for their click. That is why it is off by default.
+
+Measured on Caddy with every cloud loaded (about 12,700 ranges): a normal request takes the same with the rule as
+without it (0.06 ms), and an ad click 0.05 ms more.
+
 ## 📊 Report: bots and ad clicks
 
 `n-antibot report` reads your server's access logs (Caddy, nginx or Apache) and tells you how many visits are bots
@@ -306,7 +337,7 @@ Bots
     served:   1   <- N-antibot is not stopping these yet
 Paid ad clicks
   google: 4 clicks
-    bots:        3 (75.0%)  [network 2, robot 1]
+    bots:        3 (75.0%)  [blocked network 2, robot 1, data center 0]
     suspicious:  0 (0.0%)  [repeated IP 0, no resources 0]
     clean:       1
   ...
@@ -423,7 +454,7 @@ Or isolated, with [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-To pin a version, append the tag: `...N-antibot.git@v0.6.0`.
+To pin a version, append the tag: `...N-antibot.git@v0.7.0`.
 
 ### 🟦 Caddy setup
 
@@ -573,7 +604,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.6.0",
+  "generator": "n-antibot 0.7.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -617,6 +648,9 @@ prefix = "n_antibot"
 [nftables]
 table = "n_antibot"
 ports = [80, 443]
+
+[ads]
+cut = false                      # true: cut the ad clicks coming from data centers
 ```
 
 ### Full reference
@@ -638,6 +672,9 @@ ports = [80, 443]
 | `nginx.prefix` | string | `"n_antibot"` | Prefix of the nginx variables. |
 | `nftables.table` | string | `"n_antibot"` | Name of the firewall table. |
 | `nftables.ports` | list of numbers | `[80, 443]` | Protected ports (TCP and UDP). |
+| `ads.networks` | list | every built-in network | Clouds whose ad clicks count as bots in the report. |
+| `ads.asns` | list | `[]` | Other server ASNs for the same purpose. |
+| `ads.cut` | true/false | `false` | Cut at the server the ad clicks coming from those networks. Not valid with `nftables`. |
 
 ### Validations that protect you
 
@@ -668,6 +705,23 @@ See them at any time with `n-antibot presets`.
 | `tencent-cloud` | ✅ | AS132203, AS45090 | Tencent Cloud, international and China. A common source of bots imitating Chrome. |
 | `alibaba-cloud` | | AS45102 | Alibaba Cloud. |
 | `huawei-cloud` | | AS136907 | Huawei Cloud. |
+| `aws` | | AS16509, AS14618 | Amazon Web Services. |
+| `google-cloud` | | AS396982 | Google Cloud. Not Google's own network: Googlebot does not come from here. |
+| `digitalocean` | | AS14061 | DigitalOcean. |
+| `ovh` | | AS16276 | OVHcloud. |
+| `hetzner` | | AS24940 | Hetzner. |
+| `linode` | | AS63949 | Akamai Connected Cloud (formerly Linode). |
+| `vultr` | | AS20473 | Vultr. |
+| `oracle-cloud` | | AS31898 | Oracle Cloud. |
+| `contabo` | | AS51167 | Contabo. |
+| `scaleway` | | AS12876 | Scaleway. |
+
+The last ten are large: Amazon alone announces thousands of ranges. Blocking them for all traffic can cut off
+legitimate services hosted there (monitors, link previews, integrations). That is why they are not on by default:
+their normal use is to judge **ad clicks only**, which is what `[ads]` does.
+
+There is no list for the networks of Google (AS15169), Microsoft (AS8075), Cloudflare, Akamai or Fastly, on purpose:
+Googlebot, Bingbot and the privacy relays real people use come from them.
 
 ### Robots
 

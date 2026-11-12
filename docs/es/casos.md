@@ -144,6 +144,24 @@ presets = ["aggressive-crawlers", "scraping-libraries", "vulnerability-scanners"
 block = ["PerplexityBot"]       # añade por nombre cualquier otro
 ```
 
+## 🎯 Proteger las campañas de anuncios
+
+**Problema:** bots que hacen clic en tus anuncios desde servidores en la nube. Gastan presupuesto y, además,
+ensucian las visitas, las conversiones y los públicos de remarketing.
+
+**Cuidado con:** cortar el clic no evita el cobro, y una persona real con una VPN alojada en esas nubes vería la
+página cortada. El informe los cuenta siempre; cortarlos es opcional.
+
+[`ad-campaigns.toml`](../../examples/cases/ad-campaigns.toml)
+
+```toml
+[ads]
+cut = true
+```
+
+Después, saca el expediente para reclamar: `n-antibot report /var/log/nginx/access.log* --claim-dir reclamacion/`.
+Ver el [informe de anuncios](informe-anuncios.md).
+
 ## 🧱 Cortar antes del servidor web
 
 **Problema:** quieres que esas redes no lleguen a ningún servicio web de la máquina, tengas lo que tengas instalado

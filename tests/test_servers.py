@@ -30,6 +30,11 @@ def no_fetch(asns, **_):
     return []
 
 
+def ads_fetch(asns, **_):
+    """AS64500 stands for a data-center network: it announces loopback, so the tests can come 'from a data center'."""
+    return ["127.0.0.0/8"] if "AS64500" in asns else []
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -74,11 +79,11 @@ def caddy(tmp_path):
         pytest.skip("caddy not installed")
     procs = []
 
-    def start(block_loopback: bool) -> int:
+    def start(block_loopback: bool, config=None) -> int:
         port = free_port()
         d = tmp_path / f"caddy{port}"
         d.mkdir()
-        (d / "n-antibot.caddy").write_text(generate(cfg("caddy", block_loopback), fetch=no_fetch))
+        (d / "n-antibot.caddy").write_text(generate(config or cfg("caddy", block_loopback), fetch=ads_fetch))
         (d / "Caddyfile").write_text(
             "{\n\tauto_https off\n\tadmin off\n}\n"
             f":{port} {{\n\timport {d}/n-antibot.caddy\n\tlog {{\n\t\toutput file {d}/access.log\n\t}}\n"
@@ -108,11 +113,11 @@ def nginx(tmp_path):
         pytest.skip("nginx not installed")
     procs = []
 
-    def start(block_loopback: bool) -> int:
+    def start(block_loopback: bool, config=None) -> int:
         port = free_port()
         d: Path = tmp_path / f"nginx{port}"
         d.mkdir()
-        (d / "n-antibot.conf").write_text(generate(cfg("nginx", block_loopback), fetch=no_fetch))
+        (d / "n-antibot.conf").write_text(generate(config or cfg("nginx", block_loopback), fetch=ads_fetch))
         (d / "nginx.conf").write_text(
             f"daemon off;\nworker_processes 1;\nerror_log {d}/error.log;\npid {d}/nginx.pid;\nevents {{}}\n"
             f"http {{\n\taccess_log {d}/access.log combined;\n\tinclude {d}/n-antibot.conf;\n"
@@ -174,14 +179,14 @@ def apache(tmp_path):
         pytest.skip("apache not installed")
     procs = []
 
-    def start(block_loopback: bool, htaccess: bool = False) -> int:
+    def start(block_loopback: bool, htaccess: bool = False, config=None) -> int:
         port = free_port()
         d = tmp_path / f"apache{port}"
         for sub in ("www/api", "www/product", "www/.well-known"):
             (d / sub).mkdir(parents=True)
         for page in ("www/index.html", "www/api/hook", "www/product/index.html", "www/.well-known/x.txt"):
             (d / page).write_text("ok")
-        rules = generate(cfg("apache", block_loopback), fetch=no_fetch)
+        rules = generate(config or cfg("apache", block_loopback), fetch=ads_fetch)
         (d / "n-antibot.conf").write_text(rules)
         if htaccess:
             (d / "www/.htaccess").write_text(rules)
@@ -319,3 +324,35 @@ def test_report_reads_real_access_logs(server, request, tmp_path):
     bots = {c.click_id: c for c in rep.clicks if c.reason == "agent"}
     assert set(bots) == {"BOT-1", "BOT-2"} and all(c.cut for c in bots.values())
     assert bots["BOT-1"].first.ip == "127.0.0.1" and bots["BOT-1"].first.ts is not None
+
+
+# ---------------------------------------------------------------- paid ad clicks from data-center networks
+def ads_cfg(fmt: str):
+    return from_dict(
+        {
+            "networks": {"presets": [], "block": ["192.0.2.0/24"]},
+            "ads": {"networks": [], "asns": ["AS64500"], "cut": True},
+            "paths": {"exclude": ["/api/*", "/.well-known/*"]},
+            "output": {"format": fmt},
+        }
+    )
+
+
+@pytest.mark.parametrize("server", ["caddy", "nginx", "apache"])
+def test_ad_clicks_from_data_centers_are_cut_and_nothing_else(server, request):
+    start = request.getfixturevalue(server)
+    port = start(False, config=ads_cfg(server))
+    blocked = 403 if server == "apache" else "closed"
+    # the data-center network is NOT blocked for normal browsing
+    assert get(port, "/", CHROME) == 200
+    assert get(port, "/product/", CHROME) == 200
+    assert get(port, "/?page=2&sort=price", CHROME) == 200
+    assert get(port, "/?notgclid=abc", CHROME) == 200  # a parameter that merely ends like a click id
+    # but a paid click from it is cut, whatever the browser says it is
+    assert get(port, "/?gclid=abc123", CHROME) == blocked
+    assert get(port, "/product/?utm_source=google&gclid=abc123", CHROME) == blocked
+    assert get(port, "/?msclkid=abc&x=1", GOOGLE) == blocked
+    # excluded paths are never cut
+    assert get(port, "/api/hook?gclid=abc123", CHROME) == 200
+    # and the ordinary rules keep working
+    assert get(port, "/", BYTESPIDER) == blocked

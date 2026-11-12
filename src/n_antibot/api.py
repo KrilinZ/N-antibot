@@ -81,9 +81,9 @@ class Service:
             stale = self._classifier is None or self._clock() - self._fetched_at > self._ttl
             if stale:
                 try:
-                    fetch = self._fetch_asn or ranges.fetch_asn
+                    fetch = self._fetch_asn or ranges.fetch_asn_cached
                     labelled: list[tuple[str, str]] = []
-                    for asn in self.cfg.all_asns():
+                    for asn in (*self.cfg.all_asns(), *self.cfg.ads_asn_list()):
                         labelled += [(asn, p) for p in fetch(asn)]
                     self._labelled = labelled
                     self._classifier = report.Classifier.from_config(
@@ -197,7 +197,7 @@ class Service:
                     "source": p.source or None,
                     "checked": p.checked,
                     "clicks": len(rows),
-                    "bot_clicks": sum(c.reason in ("network", "agent") for c in rows),
+                    "bot_clicks": sum(c.reason in report.BOT_REASONS for c in rows),
                     "suspicious_clicks": sum(c.reason in ("repeated", "no-resources") for c in rows),
                     "flagged_within_deadline": len(inside),
                 }
@@ -228,7 +228,10 @@ class Service:
 
     def blocklist(self) -> dict[str, Any]:
         self.classifier()
-        v4, v6 = ranges.build([p for _, p in self._labelled], self.cfg.block_cidrs, self.cfg.allow_cidrs)
+        blocked = set(self.cfg.all_asns())
+        v4, v6 = ranges.build(
+            [p for asn, p in self._labelled if asn in blocked], self.cfg.block_cidrs, self.cfg.allow_cidrs
+        )
         bl = Blocklist(
             v4, v6, self.cfg.agents(), self.cfg.all_asns(), time.strftime("%Y-%m-%d", time.gmtime(self._fetched_at))
         )

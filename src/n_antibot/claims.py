@@ -155,7 +155,7 @@ def _n(count: int, word: str = "click") -> str:
 
 
 def _explanation(rows: list[report.AdClick], total: int, first: str, last: str) -> str:
-    nets = Counter(c.detail.rsplit(" ", 1)[0] for c in rows if c.reason == "network")
+    nets = Counter(c.detail.rsplit(" ", 1)[0] for c in rows if c.reason in ("network", "datacenter"))
     agents = Counter(c.detail for c in rows if c.reason == "agent")
     bots = sum(nets.values()) + sum(agents.values())
     parts = [
@@ -231,8 +231,8 @@ def write_packs(rep: report.Report, outdir: str | Path, *, today: datetime | Non
             for name, value in report.ad_fields(c.first.uri).items():
                 fields[name] += bool(value)
         ips = Counter(c.first.ip for c in rows)
-        why = {c.first.ip: (c.detail if c.reason in ("network", "agent") else report.REASONS[c.reason]) for c in rows}
-        bots = sum(c.reason in ("network", "agent") for c in rows)
+        why = {c.first.ip: (c.detail if c.reason in report.BOT_REASONS else report.REASONS[c.reason]) for c in rows}
+        bots = sum(c.reason in report.BOT_REASONS for c in rows)
 
         t = [f"N-antibot claim file: {platform.name}", ""]
         if platform.source:

@@ -2,6 +2,16 @@
 
 All notable changes to N-antibot. Versions follow [semantic versioning](https://semver.org/).
 
+## 0.7.0 (2026-11-13)
+
+- **Ad bots.** The report now counts as a bot every paid ad click that comes from a data-center network, even when
+  that cloud is not blocked.
+- **`[ads] cut = true`.** The server cuts only the ad clicks coming from those networks; the rest of their traffic
+  keeps getting in. Caddy, nginx, Apache, Cloudflare and the Node middleware.
+- Ten more network presets, all opt-in: `aws`, `google-cloud`, `digitalocean`, `ovh`, `hetzner`, `linode`, `vultr`,
+  `oracle-cloud`, `contabo`, `scaleway`.
+- Downloaded ranges are cached for a day (`~/.cache/n-antibot`), and an older copy is used if a download fails.
+
 ## 0.6.0 (2026-11-12)
 
 - **One-command install.** `install.sh` puts the `n-antibot` command in its own virtual environment, without

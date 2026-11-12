@@ -177,3 +177,71 @@ def test_cli_report_with_gzip_and_csv(tmp_path, monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out)["requests"] == 6
     assert main(["report", str(plain), "--since", "yesterday"]) == 3
     assert main(["report", str(tmp_path / "missing.log")]) == 3
+
+
+# ---------------------------------------------------------------- data-center networks and ad clicks
+CLOUDS = {**FAKE, "AS16509": ["3.0.0.0/9", "2600:1f00::/24"], "AS24940": ["5.9.0.0/16"]}
+
+
+def cloud_classifier(**over):
+    return report.Classifier.from_config(from_dict(over), fetch_asn=lambda asn: CLOUDS.get(asn, []))
+
+
+def test_ad_clicks_from_data_centers_are_bots_even_if_that_cloud_is_not_blocked():
+    log = [
+        combined("3.5.5.5", "12/Nov/2026:10:00:00", "/?gclid=AWS-1"),  # served: AWS is not blocked
+        combined("3.5.5.5", "12/Nov/2026:10:00:01", "/app.css"),
+        combined("5.9.1.1", "12/Nov/2026:10:01:00", "/?msclkid=HZ-1"),
+        combined("3.5.5.6", "12/Nov/2026:10:02:00", "/pricing"),  # not an ad click: nothing to flag
+        combined("81.40.1.1", "12/Nov/2026:10:03:00", "/?gclid=OK-1"),
+        combined("81.40.1.1", "12/Nov/2026:10:03:01", "/app.css"),
+    ]
+    c = cloud_classifier()
+    assert c.verdict("3.5.5.5", CHROME) is None  # not blocked for normal traffic
+    assert c.datacenter("3.5.5.5") == "AS16509 (aws) 3.0.0.0/9" and c.datacenter("2600:1f00::1").startswith("AS16509")
+    assert c.datacenter("43.173.1.1") is None  # already a blocked network, not counted twice
+    rep = report.analyze(log, c)
+    assert rep.bot_requests == 0  # the Bots section only counts what is blocked
+    assert rep.clicks_by("google") == {"total": 2, "datacenter": 1, "clean": 1}
+    assert rep.clicks_by("microsoft") == {"total": 1, "datacenter": 1}
+    aws = next(x for x in rep.clicks if x.click_id == "AWS-1")
+    assert report.click_verdict(aws) == "bot" and aws.detail == "AS16509 (aws) 3.0.0.0/9" and not aws.cut
+    text = report.render_text(rep)
+    assert "bots:        1 (50.0%)  [blocked network 0, robot 0, data center 1]" in text
+    assert report.click_dict(aws)["reason"] == "from a data-center network"
+
+
+def test_ads_networks_can_be_narrowed_or_extended():
+    only = cloud_classifier(ads={"networks": ["hetzner"]})
+    assert only.datacenter("3.5.5.5") is None and only.datacenter("5.9.1.1").startswith("AS24940 (hetzner)")
+    extra = report.Classifier.from_config(
+        from_dict({"ads": {"networks": [], "asns": ["AS64500"]}}),
+        fetch_asn=lambda asn: {"AS64500": ["198.51.100.0/24"]}.get(asn, []),
+    )
+    assert extra.datacenter("198.51.100.7") == "AS64500 198.51.100.0/24"
+    allowed = cloud_classifier(networks={"allow": ["3.5.5.5/32"]})
+    assert allowed.datacenter("3.5.5.5") is None  # your own server in AWS is never held against a click
+
+
+def test_range_cache_survives_a_failed_download(tmp_path, monkeypatch):
+    from n_antibot import ranges
+
+    monkeypatch.setenv("N_ANTIBOT_CACHE", str(tmp_path))
+    calls = []
+
+    def fetch(asn, **_):
+        calls.append(asn)
+        if len(calls) > 1:
+            raise ranges.FetchError("ripestat down")
+        return ["192.0.2.0/24"]
+
+    monkeypatch.setattr(ranges, "fetch_asn", fetch)
+    assert ranges.fetch_asn_cached("AS64500") == ["192.0.2.0/24"] and (tmp_path / "AS64500.json").exists()
+    assert ranges.fetch_asn_cached("AS64500") == ["192.0.2.0/24"] and calls == ["AS64500"]  # fresh: no download
+    assert ranges.fetch_asn_cached("AS64500", ttl=0) == ["192.0.2.0/24"] and len(calls) == 2  # stale copy used
+    import pytest
+
+    with pytest.raises(ranges.FetchError):
+        ranges.fetch_asn_cached("AS64501", ttl=0)  # nothing cached and the download fails
+    monkeypatch.setenv("N_ANTIBOT_CACHE", "off")
+    assert ranges.cache_dir() is None

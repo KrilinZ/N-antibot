@@ -79,7 +79,8 @@ function pathMatcher(pattern) {
 
 /**
  * Build a matcher from the JSON made by `n-antibot generate -f json`.
- * check({ ip, userAgent, path }) -> { blocked: boolean, reason: 'network' | 'agent' | null, match: string | null }
+ * check({ ip, userAgent, path }) -> { blocked: boolean, reason: 'network' | 'agent' | 'ad-click' | null, match }
+ * `path` may carry the query string: it is needed to recognise paid ad clicks.
  */
 export function createMatcher(data) {
   if (!data || !Array.isArray(data.ipv4) || !Array.isArray(data.ipv6) || !Array.isArray(data.user_agents)) {
@@ -90,9 +91,14 @@ export function createMatcher(data) {
   const v6 = sorted(data.ipv6);
   const agents = data.user_agents.map((a) => a.toLowerCase());
   const excluded = (data.exclude_paths || []).map(pathMatcher);
+  // Data-center networks whose paid ad clicks are cut (only when generated with `[ads] cut = true`).
+  const ads = data.ad_clicks && data.ad_clicks.cut ? data.ad_clicks : null;
+  const adV4 = ads ? sorted(ads.ipv4 || []) : [];
+  const adV6 = ads ? sorted(ads.ipv6 || []) : [];
+  const adParams = ads ? ads.params || [] : [];
 
-  function findRange(ip) {
-    const list = ip.version === 4 ? v4 : v6;
+  function findRange(ip, lists = [v4, v6]) {
+    const list = ip.version === 4 ? lists[0] : lists[1];
     let lo = 0;
     let hi = list.length - 1;
     while (lo <= hi) {
@@ -113,6 +119,13 @@ export function createMatcher(data) {
     const parsed = parseIp(ip);
     const net = parsed && findRange(parsed);
     if (net) return { blocked: true, reason: 'network', match: net };
+    if (ads && parsed) {
+      const query = new URLSearchParams(String(path || '').split('?')[1] || '');
+      if (adParams.some((name) => query.get(name))) {
+        const cloud = findRange(parsed, [adV4, adV6]);
+        if (cloud) return { blocked: true, reason: 'ad-click', match: cloud };
+      }
+    }
     return { blocked: false, reason: null, match: null };
   }
 

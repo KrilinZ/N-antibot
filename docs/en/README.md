@@ -57,6 +57,7 @@ Ads…) were made by a bot, with a CSV to claim them. ✅ Tested with real logs 
 | [Behind a CDN or load balancer](cases.md#-behind-a-cdn-or-load-balancer) | [`behind-cdn.toml`](../../examples/cases/behind-cdn.toml) |
 | [Maximum protection](cases.md#-maximum-protection) | [`strict.toml`](../../examples/cases/strict.toml) |
 | [No AI crawlers](cases.md#-no-ai-crawlers) | [`no-ai.toml`](../../examples/cases/no-ai.toml) |
+| [Protecting ad campaigns](cases.md#-protecting-ad-campaigns) | [`ad-campaigns.toml`](../../examples/cases/ad-campaigns.toml) |
 | [Cutting before the web server](cases.md#-cutting-before-the-web-server) | [`firewall.toml`](../../examples/cases/firewall.toml) |
 | [Several sites on one server](cases.md#-several-sites-on-one-server) | |
 | [I am being hit from another network](cases.md#-i-am-being-hit-from-another-network) | |
