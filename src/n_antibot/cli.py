@@ -1,4 +1,4 @@
-"""Command line: n-antibot generate | check | install | report | serve | test-agent | test-ip | presets | init."""
+"""Command line: generate | check | install | ai-check | report | serve | test-agent | test-ip | presets | init."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import __version__, api, claims, installer, report
+from . import __version__, ai, api, claims, installer, ranges, report
 from .config import FORMATS, Config, ConfigError, load
 from .core import blocklist
 from .presets import NETWORK_PRESETS, ROBOT_PRESETS
@@ -178,6 +178,33 @@ def cmd_install(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ai_check(a: argparse.Namespace) -> int:
+    cfg = load(a.config)
+    published, failed = ai.protected_ranges()
+    blocked = [p for asn in cfg.all_asns() for p in ranges.fetch_asn_cached(asn)] + list(cfg.block_cidrs)
+    rows = ai.check(cfg, blocked, published, failed)
+    cut = [r for r in rows if r["status"] == "cut"]
+    if a.json:
+        print(json.dumps(rows, indent=2))
+        return 1 if cut else 0
+    print("AI crawlers and search engines with this configuration")
+    for r in rows:
+        mark = {"ok": "ok ", "cut": "CUT", "unknown": " ? "}[r["status"]]
+        print(f"  {mark}  {r['crawler']:<22} {r['operator']:<12} {r['note']}")
+    print()
+    if cut:
+        print(
+            f"{len(cut)} would be cut off. To keep them open: protect = true under [ai], none of them under [robots]."
+        )
+    else:
+        unknown = sum(r["status"] == "unknown" for r in rows)
+        print(
+            "None is cut off."
+            + (f" {unknown} could not be checked: their address lists did not download." if unknown else "")
+        )
+    return 1 if cut else 0
+
+
 def cmd_serve(a: argparse.Namespace) -> int:
     cfg = _config(a)
     token = os.environ.get("N_ANTIBOT_TOKEN") or None
@@ -292,6 +319,13 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--dry-run", action="store_true", help="show what would change and change nothing")
     p.add_argument("--uninstall", action="store_true", help="remove it and reload")
     p.set_defaults(func=cmd_install)
+
+    p = sub.add_parser(
+        "ai-check", help="do AI crawlers and search engines get in with this configuration? (exit 1 if not)"
+    )
+    p.add_argument("-c", "--config", help="TOML configuration (defaults if omitted)")
+    p.add_argument("--json", action="store_true", help="print the result as JSON")
+    p.set_defaults(func=cmd_ai_check)
 
     p = sub.add_parser("serve", help="read-only JSON API with the report data")
     common(p, fmt=False)

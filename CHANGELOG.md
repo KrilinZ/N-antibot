@@ -2,6 +2,16 @@
 
 All notable changes to N-antibot. Versions follow [semantic versioning](https://semver.org/).
 
+## 0.8.0 (2026-11-13)
+
+- **AI crawlers and search engines are protected.** N-antibot downloads the address lists that OpenAI, Perplexity,
+  Google, Microsoft, Apple, Mistral, Common Crawl and DuckDuckGo publish, and never cuts those addresses, even
+  inside a cloud network you block. On by default (`[ai] protect`).
+- A configuration that would cut an AI crawler by name is rejected unless `[ai] protect = false`.
+- **`n-antibot ai-check`** reports, with today's data, whether a configuration lets each AI crawler and search
+  engine in. Exit code 1 if any is cut.
+- The Cloudflare expression keeps Cloudflare's verified bots.
+
 ## 0.7.0 (2026-11-13)
 
 - **Ad bots.** The report now counts as a bot every paid ad click that comes from a data-center network, even when

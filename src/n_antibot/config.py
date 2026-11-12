@@ -13,7 +13,7 @@ try:
 except ModuleNotFoundError:  # Python 3.9 and 3.10
     import tomli as tomllib
 
-from .presets import NETWORK_PRESETS, PROTECTED_AGENTS, ROBOT_PRESETS, default_names
+from .presets import AI_AGENTS, NETWORK_PRESETS, PROTECTED_AGENTS, ROBOT_PRESETS, default_names
 
 FORMATS = ("caddy", "nginx", "apache", "nftables", "cloudflare", "json")
 ASN_RE = re.compile(r"^AS\d{1,10}$")
@@ -49,6 +49,8 @@ class Config:
     ads_presets: tuple[str, ...] = field(default_factory=lambda: tuple(NETWORK_PRESETS))
     ads_asns: tuple[str, ...] = ()
     ads_cut: bool = False
+    # Never cut the published addresses of AI crawlers and search engines, even inside a blocked network.
+    ai_protect: bool = True
 
     # ---- derived lists -------------------------------------------------------------------------------------------
     def all_asns(self) -> tuple[str, ...]:
@@ -137,6 +139,14 @@ class Config:
             hit = self.blocks_agent(ua)
             if hit:
                 raise ConfigError(f"robots: {hit!r} would block a real browser or search engine: {ua!r}")
+        if self.ai_protect:
+            for name in AI_AGENTS:
+                hit = self.blocks_agent(f"{name}/1.0")
+                if hit:
+                    raise ConfigError(
+                        f"robots: {hit!r} would cut the AI crawler {name}, and [ai] protect is true. "
+                        "To block AI crawlers on purpose, set protect = false under [ai]"
+                    )
         return self
 
 
@@ -149,10 +159,11 @@ _SCHEMA: dict[str, dict[str, str]] = {
     "nginx": {"prefix": "nginx_prefix"},
     "nftables": {"table": "nftables_table", "ports": "nftables_ports"},
     "ads": {"networks": "ads_presets", "asns": "ads_asns", "cut": "ads_cut"},
+    "ai": {"protect": "ai_protect"},
 }
 _STRINGS = {"format", "caddy_prefix", "caddy_block_path", "caddy_ip_matcher", "nginx_prefix", "nftables_table"}
 _INTS = {"nftables_ports"}
-_BOOLS = {"ads_cut"}
+_BOOLS = {"ads_cut", "ai_protect"}
 
 
 def from_dict(data: dict[str, Any]) -> Config:

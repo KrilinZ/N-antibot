@@ -151,6 +151,7 @@ Caddy, nginx, Apache and `.htaccess`, the Linux firewall, Cloudflare, Node.js an
 - [Install in 2 steps](#-install-in-2-steps)
 - [What it does](#-what-it-does)
 - [Why it exists](#-why-it-exists)
+- [AI can always read your site](#-ai-can-always-read-your-site)
 - [N-antibot and PerimeterX](#-n-antibot-and-perimeterx)
 - [What it blocks and what it does not](#️-what-it-blocks-and-what-it-does-not)
 - [How it works](#️-how-it-works)
@@ -207,6 +208,58 @@ N-antibot cuts exactly that, with three principles:
 | **Do not break the site** | Search engines, AI crawlers, real browsers, `curl` and your webhooks are never touched. A configuration is rejected if one of your rules could cut off a browser or Google. |
 | **All or nothing** | If downloading the ranges fails, no file is written. The installer backs up, validates, reloads, checks the live site and rolls back by itself if anything is off. |
 
+## 🤖 AI can always read your site
+
+N-antibot does not interfere with ChatGPT, Claude, Perplexity, Gemini, Copilot or search engines. It is built to
+cut worthless bots **without losing visibility in AI answers** (GEO).
+
+| Guarantee | How it is kept |
+|---|---|
+| **By name** | No AI crawler is in the default lists. If one of your rules could cut GPTBot, ClaudeBot, PerplexityBot and the rest, the configuration is rejected. |
+| **By address** | Operators publish the addresses they crawl from. N-antibot downloads those official lists and **never cuts those addresses**, even inside a cloud you have blocked. |
+| **No loophole** | It goes by address, not by name: a scraper calling itself GPTBot does not get in that way. |
+| **Checkable** | `n-antibot ai-check` tells you, with today's data, whether your configuration cuts any of them. It exits with code `1` if so, for use in CI. |
+
+```console
+$ n-antibot ai-check
+AI crawlers and search engines with this configuration
+  ok   GPTBot                 OpenAI       none of its 18 ranges is in a network you block
+  ok   OAI-SearchBot          OpenAI       none of its 39 ranges is in a network you block
+  ok   ChatGPT-User           OpenAI       none of its 237 ranges is in a network you block
+  ok   PerplexityBot          Perplexity   none of its 13 ranges is in a network you block
+  ok   Googlebot              Google       none of its 317 ranges is in a network you block
+  ok   bingbot                Microsoft    none of its 29 ranges is in a network you block
+  ok   Applebot               Apple        none of its 24 ranges is in a network you block
+  ok   ClaudeBot              Anthropic    passes by name; there is no address list for it, so it is not kept open by address
+  ...
+None is cut off.
+```
+
+**Why protection by address matters.** Checked against the official lists on 13 November 2026: with the default
+configuration, no address of these crawlers falls in a blocked network. But if you block whole clouds (Amazon,
+Google Cloud…), without protection you would cut all 13 ranges of PerplexityBot, the 5 of CCBot and 23 of
+Googlebot's 317. With protection, which is on by default, they stay open.
+
+| Crawler | Operator | Official address list |
+|---|---|:---:|
+| GPTBot, OAI-SearchBot, ChatGPT-User | OpenAI | ✅ |
+| PerplexityBot, Perplexity-User | Perplexity | ✅ |
+| Googlebot, special crawlers and user-triggered fetchers (Gemini, NotebookLM) | Google | ✅ |
+| bingbot (also feeds Copilot) | Microsoft | ✅ |
+| Applebot | Apple | ✅ |
+| MistralAI-User | Mistral | ✅ |
+| CCBot | Common Crawl | ✅ |
+| DuckAssistBot, DuckDuckBot | DuckDuckGo | ✅ |
+| ClaudeBot, Claude-User, Claude-SearchBot | Anthropic | By name only |
+| meta-externalagent, meta-externalfetcher | Meta | By name only |
+| Amazonbot | Amazon | By name only |
+
+Those marked "by name only" always pass by name, but N-antibot has no list of their addresses: if you block the
+cloud they crawl from, they would be cut off. With the default configuration that does not happen.
+
+Do you want the opposite, AI not reading your site? You have to say it twice, so it is never an accident:
+`protect = false` under `[ai]` and the `ai-training` preset. See [the case](docs/en/cases.md#-no-ai-crawlers).
+
 ## 🥊 N-antibot and PerimeterX
 
 PerimeterX (now **HUMAN Bot Defender**) is the commercial reference against bots. N-antibot **does not do the same
@@ -242,7 +295,7 @@ like PerimeterX; N-antibot does not see them, and says so in [its limits](#-limi
 | python-requests, python-urllib, Go-http-client, Scrapy, aiohttp, libwww-perl | ⛔ cut off | `[robots] allow` |
 | zgrab, masscan, Nuclei, sqlmap, Nikto | ⛔ cut off | `[robots] allow` |
 | AhrefsBot, SemrushBot and other SEO tools | ✅ allowed | add the `seo-tools` preset |
-| GPTBot, ClaudeBot, CCBot and other AI crawlers | ✅ allowed | add the `ai-training` preset |
+| GPTBot, ChatGPT, ClaudeBot, PerplexityBot and other AI | ✅ always allowed, by name and by official address | only with `[ai] protect = false` and the `ai-training` preset |
 | Googlebot, Bingbot, DuckDuckBot, Yandex, Applebot | ✅ always allowed | cannot be blocked by mistake |
 | Chrome, Safari, Firefox, mobile browsers | ✅ always allowed | cannot be blocked by mistake |
 | `curl`, `wget` | ✅ always allowed | they are your own testing tools |
@@ -454,7 +507,7 @@ Or isolated, with [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-To pin a version, append the tag: `...N-antibot.git@v0.7.0`.
+To pin a version, append the tag: `...N-antibot.git@v0.8.0`.
 
 ### 🟦 Caddy setup
 
@@ -604,7 +657,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.7.0",
+  "generator": "n-antibot 0.8.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -674,6 +727,7 @@ cut = false                      # true: cut the ad clicks coming from data cent
 | `nftables.ports` | list of numbers | `[80, 443]` | Protected ports (TCP and UDP). |
 | `ads.networks` | list | every built-in network | Clouds whose ad clicks count as bots in the report. |
 | `ads.asns` | list | `[]` | Other server ASNs for the same purpose. |
+| `ai.protect` | true/false | `true` | Never cut the official addresses of AI crawlers and search engines, nor let a rule cut them by name. |
 | `ads.cut` | true/false | `false` | Cut at the server the ad clicks coming from those networks. Not valid with `nftables`. |
 
 ### Validations that protect you
@@ -740,6 +794,7 @@ Googlebot, Bingbot and the privacy relays real people use come from them.
 | `n-antibot generate [-c CFG] [-f FORMAT] [-o FILE]` | Downloads ranges and writes the file (or prints it). | `0` ok |
 | `n-antibot check [-c CFG] [-f FORMAT] -o FILE` | Says whether the file is up to date. | `0` up to date · `1` out of date |
 | `n-antibot install [SERVER] --site SITE [--check-url URL] [--dry-run] [--uninstall]` | Installs it on Caddy, nginx, Apache or nftables: backs up, validates, reloads, checks and rolls back on failure. | `0` · `5` not installed |
+| `n-antibot ai-check [-c CFG] [--json]` | Do AI crawlers and search engines get in with this configuration? Uses their official address lists. | `0` they do · `1` some are cut |
 | `n-antibot report [-c CFG] LOG… [--csv FILE]` | Reads access logs: bots and ad clicks made by bots. [Guide](docs/en/ads-report.md). | `0` |
 | `n-antibot report … --claim-dir DIR` | Also one file set per ad platform with what each one asks for. | `0` |
 | `n-antibot serve [-c CFG] LOG…` | Read-only JSON API with that data. [Guide](docs/en/api.md). | `0` |
@@ -928,7 +983,9 @@ your rules could cut them off. The tests check it with their real `User-Agent` s
 <details>
 <summary><b>And my presence in ChatGPT, Claude or Perplexity?</b></summary>
 
-Not either: AI crawlers are allowed by default. They are only blocked if you add the `ai-training` preset yourself.
+Not either: AI always gets in, by name and by its official addresses, and `n-antibot ai-check` verifies it. It is
+only blocked if you ask for it explicitly with `protect = false` under `[ai]` and the `ai-training` preset. See
+[AI can always read your site](#-ai-can-always-read-your-site).
 </details>
 
 <details>
@@ -999,6 +1056,7 @@ N-antibot/
 │   ├── ranges.py       # RIPEstat download, merging and subtracting ranges
 │   ├── render.py       # outputs: Caddy, nginx, Apache, nftables, Cloudflare and JSON
 │   ├── report.py       # report from the logs: bots and ad clicks
+│   ├── ai.py           # AI crawlers and search engines: their official addresses are never cut
 │   ├── claims.py       # where each ad platform takes claims, and the per-platform file set
 │   ├── api.py          # read-only API (n-antibot serve)
 │   ├── installer.py    # n-antibot install: backs up, validates, reloads, checks and rolls back

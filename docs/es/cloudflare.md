@@ -50,8 +50,8 @@ caen bots, pásala a **Block**.
   regenerar la expresión si cambias tu configuración.
 - **Límite de tamaño.** Una expresión admite 4.096 caracteres. La configuración por defecto ocupa menos de 1.000.
   Si añades muchos robots o rangos y te pasas, reparte en dos reglas.
-- **Bots verificados.** Cloudflare tiene su propio campo `cf.client.bot` para buscadores verificados. N-antibot no
-  bloquea ninguno, así que no hace falta añadirlo.
+- **Bots verificados.** La expresión termina con `and not cf.client.bot`: los buscadores y rastreadores que
+  Cloudflare da por verificados nunca se cortan. Se quita con `protect = false` en `[ai]`.
 - **Combinarlo con tu servidor.** Si además instalas N-antibot en Caddy o nginx detrás de Cloudflare, configura la
   IP real del visitante (ver sus guías).
 

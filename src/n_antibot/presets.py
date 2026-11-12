@@ -48,6 +48,27 @@ NETWORK_PRESETS: dict[str, Preset] = {
 #   AS15169 Google and AS8075 Microsoft: Googlebot and Bingbot live there.
 #   AS13335 Cloudflare, AS36183 Akamai and AS54113 Fastly: iCloud Private Relay and similar privacy relays exit there.
 
+# AI crawlers and assistants, by the name they use in the User-Agent. They are never cut while `[ai] protect` is on.
+AI_AGENTS: tuple[str, ...] = (
+    "GPTBot",
+    "OAI-SearchBot",
+    "ChatGPT-User",
+    "ClaudeBot",
+    "Claude-User",
+    "Claude-SearchBot",
+    "PerplexityBot",
+    "Perplexity-User",
+    "MistralAI-User",
+    "DuckAssistBot",
+    "meta-externalagent",
+    "meta-externalfetcher",
+    "Amazonbot",
+    "CCBot",
+    "Applebot",
+    "cohere-ai",
+    "anthropic-ai",
+)
+
 # Click identifiers that ad platforms append to the landing URL.
 AD_CLICK_PARAMS: tuple[str, ...] = ("gclid", "gbraid", "wbraid", "msclkid", "ttclid", "twclid", "li_fat_id")
 
@@ -80,7 +101,7 @@ ROBOT_PRESETS: dict[str, Preset] = {
         ),
         Preset(
             "ai-training",
-            "AI crawlers. Opt-in: blocking them removes your site from AI answers (GEO).",
+            "AI crawlers. Opt-in, and it needs [ai] protect = false: blocking them removes your site from AI answers.",
             ("GPTBot", "ClaudeBot", "anthropic-ai", "CCBot", "meta-externalagent", "Amazonbot", "cohere-ai"),
         ),
     ]

@@ -248,6 +248,8 @@ def cloudflare(bl: Blocklist, cfg: Config) -> str:
         click = " or ".join(f'http.request.uri.query contains "{name}="' for name in AD_CLICK_PARAMS)
         block.append("(ip.src.asnum in {" + " ".join(a[2:] for a in bl.ads_asns) + "} and (" + click + "))")
     expr = "(" + " or ".join(block) + ")"
+    if cfg.ai_protect:
+        expr += " and not cf.client.bot"  # Cloudflare's own list of verified search engines and AI crawlers
     if bl.manual_allow:
         expr += " and not ip.src in {" + " ".join(bl.manual_allow) + "}"
     for p in cfg.exclude_paths:

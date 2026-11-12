@@ -135,14 +135,19 @@ def test_every_preset_is_individually_valid():
     for name in NETWORK_PRESETS:
         from_dict({"networks": {"presets": [name]}})
     for name in ROBOT_PRESETS:
-        from_dict({"robots": {"presets": [name]}})
+        from_dict({"robots": {"presets": [name]}, "ai": {"protect": name != "ai-training"}})
 
 
 def test_ai_crawlers_are_opt_in_for_geo():
     cfg = Config().validate()
     for ua in ["Mozilla/5.0 (compatible; GPTBot/1.2)", "ClaudeBot/1.0", "PerplexityBot/1.0", "AhrefsBot/7.0"]:
         assert cfg.blocks_agent(ua) is None, ua
-    assert from_dict({"robots": {"presets": ["ai-training"]}}).blocks_agent("ClaudeBot/1.0") == "ClaudeBot"
+    wants_no_ai = from_dict({"robots": {"presets": ["ai-training"]}, "ai": {"protect": False}})
+    assert wants_no_ai.blocks_agent("ClaudeBot/1.0") == "ClaudeBot"
+    with pytest.raises(ConfigError, match="would cut the AI crawler"):
+        from_dict({"robots": {"presets": ["ai-training"]}})  # blocking AI must be said twice: it is never an accident
+    with pytest.raises(ConfigError, match="would cut the AI crawler PerplexityBot"):
+        from_dict({"robots": {"block": ["PerplexityBot"]}})
 
 
 # ---------------------------------------------------------------- renderers
@@ -311,7 +316,7 @@ def test_cloudflare_expression():
     assert calls == []  # matched by ASN: nothing is downloaded
     assert expr.startswith("(ip.src.asnum in {132203 45090} or ip.src in {203.0.113.0/24} or ")
     assert 'lower(http.user_agent) contains "bytespider"' in expr
-    assert ") and not ip.src in {43.173.5.5/32}" in expr
+    assert ") and not cf.client.bot and not ip.src in {43.173.5.5/32}" in expr
     assert 'and not starts_with(http.request.uri.path, "/api/")' in expr
     assert 'and not http.request.uri.path eq "/health"' in expr
     assert 'and not ends_with(http.request.uri.path, ".xml")' in expr

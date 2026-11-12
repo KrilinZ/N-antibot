@@ -50,8 +50,8 @@ only bots match, switch it to **Block**.
   to regenerate the expression when your configuration changes.
 - **Size limit.** An expression can be up to 4,096 characters. The default configuration takes under 1,000. If you
   add many robots or ranges and go over, split it into two rules.
-- **Verified bots.** Cloudflare has its own `cf.client.bot` field for verified search engines. N-antibot blocks
-  none of them, so there is no need to add it.
+- **Verified bots.** The expression ends with `and not cf.client.bot`: the search engines and crawlers that
+  Cloudflare considers verified are never cut. Remove it with `protect = false` under `[ai]`.
 - **Combining it with your server.** If you also install N-antibot on Caddy or nginx behind Cloudflare, configure
   the visitor's real IP (see their guides).
 

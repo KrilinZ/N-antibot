@@ -51,3 +51,8 @@ ports = [80, 443]
 asns = []
 # true: also cut those ad clicks at the server. The rest of the traffic from those networks keeps getting in.
 cut = false
+
+[ai]
+# Never cut the published addresses of AI crawlers and search engines (GPTBot, ChatGPT, Perplexity, Googlebot,
+# Bingbot, Applebot...), even inside a network you block. Set it to false only to block AI crawlers on purpose.
+protect = true

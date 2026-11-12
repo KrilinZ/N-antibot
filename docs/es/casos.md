@@ -139,6 +139,9 @@ negocio, no técnica.
 [`no-ai.toml`](../../examples/cases/no-ai.toml)
 
 ```toml
+[ai]
+protect = false                 # las IA van protegidas por defecto: hay que quitarlo expresamente
+
 [robots]
 presets = ["aggressive-crawlers", "scraping-libraries", "vulnerability-scanners", "ai-training"]
 block = ["PerplexityBot"]       # añade por nombre cualquier otro

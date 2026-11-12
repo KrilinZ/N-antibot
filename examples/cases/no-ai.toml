@@ -1,4 +1,8 @@
 # Keep AI crawlers out. Your site will stop appearing in AI answers (ChatGPT, Claude...).
+[ai]
+# AI crawlers are protected by default. Turning this off is what lets you block them.
+protect = false
+
 [robots]
 presets = ["aggressive-crawlers", "scraping-libraries", "vulnerability-scanners", "ai-training"]
 # PerplexityBot is not in the preset: add any other crawler by name.

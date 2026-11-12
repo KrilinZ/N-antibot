@@ -138,6 +138,9 @@ decision, not a technical one.
 [`no-ai.toml`](../../examples/cases/no-ai.toml)
 
 ```toml
+[ai]
+protect = false                 # AI is protected by default: it has to be turned off on purpose
+
 [robots]
 presets = ["aggressive-crawlers", "scraping-libraries", "vulnerability-scanners", "ai-training"]
 block = ["PerplexityBot"]       # add any other by name
