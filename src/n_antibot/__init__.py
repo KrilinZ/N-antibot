@@ -1,6 +1,6 @@
 """N-antibot: block bot networks and scraper user agents at your web server (Caddy, nginx) without accounts or keys."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .config import Config, ConfigError, load
 from .core import generate

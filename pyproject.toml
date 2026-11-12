@@ -4,22 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "n-antibot"
-version = "0.2.0"
+version = "0.3.0"
 description = "Block bot networks and scraper user agents at your web server (Caddy, nginx). No accounts, no keys, no dependencies."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 authors = [{ name = "Nacho López" }]
 keywords = ["bot", "antibot", "scraper", "caddy", "nginx", "firewall", "waf", "security", "seo", "geo"]
 classifiers = [
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.14",
   "Operating System :: OS Independent",
   "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
   "Topic :: Security",
   "Environment :: Console",
 ]
-dependencies = []
+dependencies = ["tomli>=2; python_version < '3.11'"]
 
 [project.urls]
 Homepage = "https://github.com/KrilinZ/N-antibot"
@@ -33,7 +35,7 @@ n_antibot = ["example.toml"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py39"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

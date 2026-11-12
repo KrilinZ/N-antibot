@@ -8,9 +8,9 @@ import random
 import time
 import urllib.request
 from collections.abc import Callable, Iterable
-from typing import Any
+from typing import Any, Union
 
-Network = ipaddress.IPv4Network | ipaddress.IPv6Network
+Network = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 
 RIPESTAT_URL = "https://stat.ripe.net/data/announced-prefixes/data.json?resource={asn}&sourceapp=n-antibot"
 USER_AGENT = "n-antibot (+https://github.com/KrilinZ/N-antibot)"

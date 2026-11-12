@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import ipaddress
 import re
-import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.9 and 3.10
+    import tomli as tomllib
 
 from .presets import NETWORK_PRESETS, PROTECTED_AGENTS, ROBOT_PRESETS, default_names
 

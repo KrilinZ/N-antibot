@@ -49,7 +49,7 @@ def cmd_generate(a: argparse.Namespace) -> int:
     else:
         _write_atomic(Path(a.output), text)
     print(
-        f"n-antibot: {len(bl.v4)} IPv4 + {len(bl.v6)} IPv6 ranges, {len(bl.agents)} robots → {a.output or 'stdout'}",
+        f"n-antibot: {len(bl.v4)} IPv4 + {len(bl.v6)} IPv6 ranges, {len(bl.agents)} robots -> {a.output or 'stdout'}",
         file=sys.stderr,
     )
     return 0

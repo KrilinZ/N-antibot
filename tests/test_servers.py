@@ -4,6 +4,8 @@ Skipped when the binaries are not installed. Loopback (127.0.0.1) is added to th
 block can be tested locally.
 """
 
+from __future__ import annotations
+
 import http.client
 import shutil
 import socket

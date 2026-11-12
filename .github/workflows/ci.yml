@@ -6,20 +6,76 @@ on:
 permissions:
   contents: read
 jobs:
-  test:
+  # Every supported Python, with real Caddy, nginx, Apache and nftables.
+  python:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python: ['3.11', '3.12', '3.13']
+        python: ['3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      # Real servers, so the end-to-end tests run instead of being skipped.
-      - run: sudo apt-get update && sudo apt-get install -y nginx caddy apache2 nftables
+      - name: Install servers
+        run: |
+          sudo apt-get update
+          for p in nginx apache2 nftables caddy; do sudo apt-get install -y "$p" || echo "::warning::$p not available"; done
       - run: pip install -e . pytest ruff
       - run: ruff check src tests
       - run: ruff format --check src tests
       - run: pytest -q -rs
+
+  # Other operating systems and older server versions.
+  platforms:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install servers (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          for p in nginx apache2 nftables caddy; do sudo apt-get install -y "$p" || echo "::warning::$p not available"; done
+      - name: Install servers (macOS)
+        if: runner.os == 'macOS'
+        run: brew install caddy nginx
+      - name: Versions
+        shell: bash
+        run: |
+          python --version
+          caddy version || echo "caddy: not installed"
+          nginx -v || echo "nginx: not installed"
+          (apache2 -v || httpd -v || /usr/sbin/httpd -v) 2>/dev/null || echo "apache: not installed"
+          (sudo nft --version) 2>/dev/null || echo "nft: not installed"
+      - run: pip install -e . pytest
+      - run: pytest -q -rs
+      - name: Command line smoke test
+        shell: bash
+        run: |
+          n-antibot --version
+          n-antibot generate -f caddy -o out.caddy
+          n-antibot check -f caddy -o out.caddy
+          n-antibot test-agent "python-requests/2.32"
+
+  # The Node middleware on every maintained Node line.
+  node:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20', '22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --version
       - run: node --test tests/node/n-antibot.test.mjs
