@@ -37,20 +37,52 @@ It also **reads your logs and counts how many ad clicks were made by a bot**, wi
 [claim them from Google, Microsoft and the other platforms](#-where-to-claim-fraudulent-clicks), and an
 [API](#-data-api) to query that data.
 
+## ⚡ Install in 2 steps
+
+On your web server (Caddy, nginx or Apache):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/KrilinZ/N-antibot/main/install.sh | sudo sh
+```
+
+```bash
+sudo n-antibot install --site example.com --check-url https://example.com
+```
+
 ```console
-$ pip install git+https://github.com/KrilinZ/N-antibot.git
-$ n-antibot generate -o n-antibot.caddy
-n-antibot: 241 IPv4 + 17 IPv6 ranges, 18 robots -> n-antibot.caddy
-$ sudo ./install/caddy.sh --site example.com --snippet n-antibot.caddy --check-url https://example.com
-n-antibot: ok   Chrome    -> 200
-n-antibot: ok   Googlebot -> 200
-n-antibot: ok   curl      -> 200
-n-antibot: ok   Bytespider -> 000
+n-antibot: found example.com in /etc/caddy/Caddyfile (caddy)
+n-antibot: server: caddy, configuration: /etc/caddy/Caddyfile, file: /etc/caddy/n-antibot.caddy
+n-antibot: add 1 line: import /etc/caddy/n-antibot.caddy
+n-antibot: backup in /var/backups/n-antibot/20261112-233030
+n-antibot: caddy reloaded
+n-antibot: ok   browser    -> 200
+n-antibot: ok   Googlebot  -> 200
+n-antibot: ok   curl       -> 200
+n-antibot: ok   Bytespider -> closed (expected closed)
 n-antibot: installed: example.com is protected
 ```
 
+| Step | What it does | If something fails |
+|---|---|---|
+| 1. The script | Installs the `n-antibot` command in its own environment (`/opt/n-antibot`), without touching the system Python. It only needs Python 3.9 or later. | Nothing else is changed |
+| 2. `n-antibot install` | Finds your site in the server configuration, backs it up, adds **one line**, validates with the server itself, reloads and checks live that a browser and Google get in and a robot does not. | Everything is put back as it was |
+
+| Do you want to…? | Command |
+|---|---|
+| See what it would do, changing nothing | `sudo n-antibot install --site example.com --dry-run` |
+| Remove it | `sudo n-antibot install --site example.com --uninstall` |
+| Name the server and file yourself | `sudo n-antibot install nginx --site example.com --config-file /etc/nginx/sites-enabled/example` |
+| Use your own configuration | `sudo n-antibot install -c n-antibot.toml --site example.com` |
+| Cut at the Linux firewall | `sudo n-antibot install nftables` |
+| Read the script before running it | [install.sh](install.sh) (60 lines) |
+
+No administrator access, or your site goes through Cloudflare, Vercel or Node? See the
+[guides by technology](#-guides-by-technology-and-by-use-case).
+
+
 ## 📚 Contents
 
+- [Install in 2 steps](#-install-in-2-steps)
 - [Why it exists](#-why-it-exists)
 - [What it blocks and what it does not](#️-what-it-blocks-and-what-it-does-not)
 - [How it works](#️-how-it-works)
@@ -153,7 +185,7 @@ handle /__n_antibot_blocked {
 }
 ```
 
-The tests start a real Caddy with `handle /producto/*` and check that the cut reaches it too.
+The tests start a real Caddy with `handle /product/*` and check that the cut reaches it too.
 </details>
 
 ## 📖 Guides by technology and by use case
@@ -228,6 +260,8 @@ here is untested, even if it may work.
 
 ## 🚀 Installation
 
+The shortest way is the [two-step script](#-install-in-2-steps). If you would rather install it yourself with `pip`:
+
 ```bash
 pip install git+https://github.com/KrilinZ/N-antibot.git
 ```
@@ -238,7 +272,7 @@ Or isolated, with [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-To pin a version, append the tag: `...N-antibot.git@v0.5.0`.
+To pin a version, append the tag: `...N-antibot.git@v0.6.0`.
 
 ### 🟦 Caddy setup
 
@@ -254,7 +288,13 @@ n-antibot init -o n-antibot.toml
 n-antibot generate -c n-antibot.toml -o n-antibot.caddy
 ```
 
-**3. Install it with the safe installer** (on the server, as root).
+**3. Install it** (on the server, as root). Steps 2 and 3 are done in one go with:
+
+```bash
+sudo n-antibot install caddy -c n-antibot.toml --site example.com --check-url https://example.com
+```
+
+If there is no Python on the server, generate the file on another machine and use the bash installer:
 
 ```bash
 sudo ./install/caddy.sh --site example.com --snippet n-antibot.caddy --check-url https://example.com
@@ -347,6 +387,8 @@ http {
 sudo nginx -t && sudo nginx -s reload
 ```
 
+All three steps, with backup and rollback, are done by `sudo n-antibot install nginx --site example.com`.
+
 `444` is nginx's special code for **closing the connection without answering**, the same as `abort` in Caddy.
 
 The file defines four variables:
@@ -380,7 +422,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.5.0",
+  "generator": "n-antibot 0.6.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -492,6 +534,7 @@ See them at any time with `n-antibot presets`.
 |---|---|---|
 | `n-antibot generate [-c CFG] [-f FORMAT] [-o FILE]` | Downloads ranges and writes the file (or prints it). | `0` ok |
 | `n-antibot check [-c CFG] [-f FORMAT] -o FILE` | Says whether the file is up to date. | `0` up to date · `1` out of date |
+| `n-antibot install [SERVER] --site SITE [--check-url URL] [--dry-run] [--uninstall]` | Installs it on Caddy, nginx, Apache or nftables: backs up, validates, reloads, checks and rolls back on failure. | `0` · `5` not installed |
 | `n-antibot report [-c CFG] LOG… [--csv FILE]` | Reads access logs: bots and ad clicks made by bots. [Guide](docs/en/ads-report.md). | `0` |
 | `n-antibot report … --claim-dir DIR` | Also one file set per ad platform with what each one asks for. | `0` |
 | `n-antibot serve [-c CFG] LOG…` | Read-only JSON API with that data. [Guide](docs/en/api.md). | `0` |
@@ -785,10 +828,12 @@ N-antibot/
 │   ├── report.py       # report from the logs: bots and ad clicks
 │   ├── claims.py       # where each ad platform takes claims, and the per-platform file set
 │   ├── api.py          # read-only API (n-antibot serve)
+│   ├── installer.py    # n-antibot install: backs up, validates, reloads, checks and rolls back
 │   ├── core.py         # generate(): from configuration to file
 │   ├── cli.py          # command line
 │   └── example.toml    # example configuration (n-antibot init)
-├── install/caddy.sh    # safe installer for Caddy
+├── install.sh          # one-command install (own environment, system Python untouched)
+├── install/caddy.sh    # bash installer for Caddy, for servers without Python
 ├── integrations/node/  # middleware for Node.js, Express and Next.js
 ├── docs/es/ · docs/en/ # guides by technology and by use case
 ├── examples/           # Caddyfile, nginx.conf, weekly update and cases/ (configurations per use case)

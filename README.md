@@ -37,20 +37,52 @@ Además, **lee tus registros y cuenta cuántos clics de anuncios los hizo un bot
 [reclamarlos a Google, Microsoft y las demás plataformas](#-dónde-reclamar-los-clics-fraudulentos), y una
 [API](#-api-de-datos) para consultar esos datos.
 
+## ⚡ Instalar en 2 pasos
+
+En el servidor de tu web (Caddy, nginx o Apache):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/KrilinZ/N-antibot/main/install.sh | sudo sh
+```
+
+```bash
+sudo n-antibot install --site example.com --check-url https://example.com
+```
+
 ```console
-$ pip install git+https://github.com/KrilinZ/N-antibot.git
-$ n-antibot generate -o n-antibot.caddy
-n-antibot: 241 IPv4 + 17 IPv6 ranges, 18 robots -> n-antibot.caddy
-$ sudo ./install/caddy.sh --site example.com --snippet n-antibot.caddy --check-url https://example.com
-n-antibot: ok   Chrome    -> 200
-n-antibot: ok   Googlebot -> 200
-n-antibot: ok   curl      -> 200
-n-antibot: ok   Bytespider -> 000
+n-antibot: found example.com in /etc/caddy/Caddyfile (caddy)
+n-antibot: server: caddy, configuration: /etc/caddy/Caddyfile, file: /etc/caddy/n-antibot.caddy
+n-antibot: add 1 line: import /etc/caddy/n-antibot.caddy
+n-antibot: backup in /var/backups/n-antibot/20261112-233030
+n-antibot: caddy reloaded
+n-antibot: ok   browser    -> 200
+n-antibot: ok   Googlebot  -> 200
+n-antibot: ok   curl       -> 200
+n-antibot: ok   Bytespider -> closed (expected closed)
 n-antibot: installed: example.com is protected
 ```
 
+| Paso | Qué hace | Si algo falla |
+|---|---|---|
+| 1. El script | Instala el comando `n-antibot` en su propio entorno (`/opt/n-antibot`), sin tocar el Python del sistema. Solo necesita Python 3.9 o superior. | No cambia nada más |
+| 2. `n-antibot install` | Encuentra tu web en la configuración del servidor, hace copia, añade **una línea**, valida con el propio servidor, recarga y comprueba en vivo que un navegador y Google entran y un robot no. | Lo deja todo como estaba |
+
+| ¿Quieres…? | Comando |
+|---|---|
+| Ver qué haría, sin tocar nada | `sudo n-antibot install --site example.com --dry-run` |
+| Quitarlo | `sudo n-antibot install --site example.com --uninstall` |
+| Decirle tú el servidor y el archivo | `sudo n-antibot install nginx --site example.com --config-file /etc/nginx/sites-enabled/example` |
+| Usar tu propia configuración | `sudo n-antibot install -c n-antibot.toml --site example.com` |
+| Cortar en el cortafuegos de Linux | `sudo n-antibot install nftables` |
+| Leer el script antes de ejecutarlo | [install.sh](install.sh) (60 líneas) |
+
+¿Sin acceso de administrador, o tu web va por Cloudflare, Vercel o Node? Mira las
+[guías por tecnología](#-guías-por-tecnología-y-por-caso).
+
+
 ## 📚 Índice
 
+- [Instalar en 2 pasos](#-instalar-en-2-pasos)
 - [Por qué existe](#-por-qué-existe)
 - [Qué bloquea y qué no](#️-qué-bloquea-y-qué-no)
 - [Cómo funciona](#️-cómo-funciona)
@@ -141,7 +173,7 @@ flowchart LR
 <summary><b>El detalle de Caddy que más cuesta descubrir</b></summary>
 
 En Caddy, un `handle @matcher` con matcher con nombre se ordena **detrás** de los `handle /ruta/*`. Si tu web tiene
-`handle /producto/*` o `handle /api/*`, un bloqueo escrito como `handle @bots { abort }` nunca llegaría a esas rutas.
+`handle /product/*` o `handle /api/*`, un bloqueo escrito como `handle @bots { abort }` nunca llegaría a esas rutas.
 
 N-antibot lo resuelve con dos pasos: un `rewrite` (que Caddy ejecuta antes que cualquier `handle`) lleva la petición
 a una ruta privada, y un `handle` de **ruta exacta** (que gana a los de prefijo) la aborta:
@@ -154,7 +186,7 @@ handle /__n_antibot_blocked {
 }
 ```
 
-Las pruebas arrancan un Caddy real con `handle /producto/*` y comprueban que el corte llega también ahí.
+Las pruebas arrancan un Caddy real con `handle /product/*` y comprueban que el corte llega también ahí.
 </details>
 
 ## 📖 Guías por tecnología y por caso
@@ -228,6 +260,8 @@ está probado, aunque pueda funcionar.
 
 ## 🚀 Instalación
 
+Lo más corto es el [script de dos pasos](#-instalar-en-2-pasos). Si prefieres instalarlo tú con `pip`:
+
 ```bash
 pip install git+https://github.com/KrilinZ/N-antibot.git
 ```
@@ -238,7 +272,7 @@ O aislado, con [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.5.0`.
+Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.6.0`.
 
 ### 🟦 Instalación en Caddy
 
@@ -254,7 +288,13 @@ n-antibot init -o n-antibot.toml
 n-antibot generate -c n-antibot.toml -o n-antibot.caddy
 ```
 
-**3. Instálalo con el instalador seguro** (en el servidor, como root).
+**3. Instálalo** (en el servidor, como root). Los pasos 2 y 3 se hacen de una vez con:
+
+```bash
+sudo n-antibot install caddy -c n-antibot.toml --site example.com --check-url https://example.com
+```
+
+Si no tienes Python en el servidor, genera el archivo en otra máquina y usa el instalador en bash:
 
 ```bash
 sudo ./install/caddy.sh --site example.com --snippet n-antibot.caddy --check-url https://example.com
@@ -347,6 +387,8 @@ http {
 sudo nginx -t && sudo nginx -s reload
 ```
 
+Los tres pasos, con copia y vuelta atrás, los hace `sudo n-antibot install nginx --site example.com`.
+
 `444` es el código especial de nginx para **cerrar la conexión sin responder**, lo mismo que hace `abort` en Caddy.
 
 El archivo define cuatro variables:
@@ -380,7 +422,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.5.0",
+  "generator": "n-antibot 0.6.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -492,6 +534,7 @@ Míralas en cualquier momento con `n-antibot presets`.
 |---|---|---|
 | `n-antibot generate [-c CFG] [-f FORMATO] [-o ARCHIVO]` | Descarga rangos y escribe el archivo (o lo imprime). | `0` bien |
 | `n-antibot check [-c CFG] [-f FORMATO] -o ARCHIVO` | Dice si el archivo está al día. | `0` al día · `1` desactualizado |
+| `n-antibot install [SERVIDOR] --site WEB [--check-url URL] [--dry-run] [--uninstall]` | Lo instala en Caddy, nginx, Apache o nftables: copia, valida, recarga, comprueba y vuelve atrás si falla. | `0` · `5` no instalado |
 | `n-antibot report [-c CFG] REGISTRO… [--csv ARCHIVO]` | Lee registros de acceso: bots y clics de anuncios hechos por bots. [Guía](docs/es/informe-anuncios.md). | `0` |
 | `n-antibot report … --claim-dir CARPETA` | Además, un expediente por plataforma de anuncios con lo que pide cada una. | `0` |
 | `n-antibot serve [-c CFG] REGISTRO…` | API de solo lectura en JSON con esos datos. [Guía](docs/es/api.md). | `0` |
@@ -786,10 +829,12 @@ N-antibot/
 │   ├── report.py       # informe desde los registros: bots y clics de anuncios
 │   ├── claims.py       # dónde reclama cada plataforma de anuncios y el expediente por plataforma
 │   ├── api.py          # API de solo lectura (n-antibot serve)
+│   ├── installer.py    # n-antibot install: copia, valida, recarga, comprueba y vuelve atrás
 │   ├── core.py         # generate(): de la configuración al archivo
 │   ├── cli.py          # línea de comandos
 │   └── example.toml    # configuración de ejemplo (n-antibot init)
-├── install/caddy.sh    # instalador seguro para Caddy
+├── install.sh          # instalación en un comando (entorno propio, sin tocar el Python del sistema)
+├── install/caddy.sh    # instalador en bash para Caddy, para servidores sin Python
 ├── integrations/node/  # middleware para Node.js, Express y Next.js
 ├── docs/es/ · docs/en/ # guías por tecnología y por caso de uso
 ├── examples/           # Caddyfile, nginx.conf, actualización semanal y cases/ (configuraciones por caso)

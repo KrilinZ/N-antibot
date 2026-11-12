@@ -18,6 +18,16 @@
 > [!WARNING]
 > It is no use behind a CDN or a load balancer: the firewall sees the proxy's IP, not the visitor's.
 
+## The short way
+
+```bash
+sudo n-antibot install nftables -c firewall.toml
+```
+
+It checks the rules with `nft -c` before loading them and leaves them in `/etc/nftables.d/n-antibot.nft`. With
+`--dry-run` it only validates them; with `--uninstall` it deletes the table. Tested on Linux (continuous
+integration).
+
 ## Steps
 
 **1. Generate the file.** Start from [`examples/cases/firewall.toml`](../../examples/cases/firewall.toml).

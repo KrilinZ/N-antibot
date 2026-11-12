@@ -18,6 +18,15 @@
 > [!WARNING]
 > No sirve detrás de un CDN o un balanceador: al cortafuegos le llega la IP del proxy, no la del visitante.
 
+## Lo más corto
+
+```bash
+sudo n-antibot install nftables -c firewall.toml
+```
+
+Comprueba las reglas con `nft -c` antes de cargarlas y las deja en `/etc/nftables.d/n-antibot.nft`. Con
+`--dry-run` solo las valida; con `--uninstall` borra la tabla. Probado en Linux (integración continua).
+
 ## Pasos
 
 **1. Genera el archivo.** Parte de [`examples/cases/firewall.toml`](../../examples/cases/firewall.toml).

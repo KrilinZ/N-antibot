@@ -1,4 +1,4 @@
-"""Command line: n-antibot generate | check | report | serve | test-agent | test-ip | presets | init."""
+"""Command line: n-antibot generate | check | install | report | serve | test-agent | test-ip | presets | init."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import __version__, api, claims, report
+from . import __version__, api, claims, installer, report
 from .config import FORMATS, Config, ConfigError, load
 from .core import blocklist
 from .presets import NETWORK_PRESETS, ROBOT_PRESETS
@@ -126,6 +126,58 @@ def cmd_report(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_install(a: argparse.Namespace) -> int:
+    say = lambda text: print(f"n-antibot: {text}", flush=True)  # noqa: E731
+    server = a.server
+    if server != "nftables" and not a.site:
+        raise ValueError("--site is required (the address of the site as written in your server's configuration)")
+    config_file = Path(a.config_file) if a.config_file else None
+    if server is None:
+        found = installer.detect(a.site)
+        if not found:
+            raise ValueError(
+                f"no Caddy, nginx or Apache configuration declaring {a.site} was found in the usual places. "
+                "Say which server and file: n-antibot install nginx --site SITE --config-file FILE"
+            )
+        if len(found) > 1:
+            names = ", ".join(f"{s} ({c})" for s, c in found)
+            raise ValueError(
+                f"{a.site} is declared in more than one server: {names}. Say which: n-antibot install SERVER ..."
+            )
+        server, config_file = found[0]
+        say(f"found {a.site} in {config_file} ({server})")
+    cfg = replace(load(a.config), format=server).validate()
+    text = None if a.uninstall else render(blocklist(cfg), cfg)
+    try:
+        if server == "nftables":
+            dest = Path(a.dest or "/etc/nftables.d/n-antibot.nft")
+            installer.apply_nftables(
+                text or "", cfg.nftables_table, dest, uninstall=a.uninstall, dry_run=a.dry_run, say=say
+            )
+            return 0
+        if config_file is None:
+            config_file = installer.find_config(server, a.site)
+            if config_file is None:
+                raise ValueError(f"no {server} configuration declaring {a.site} was found: pass --config-file FILE")
+        p = installer.plan(server, config_file, prefix=cfg.nginx_prefix, dest=Path(a.dest) if a.dest else None)
+        agents = cfg.agents()
+        installer.apply(
+            p,
+            a.site,
+            text,
+            backup_dir=Path(a.backup_dir),
+            check_url=a.check_url,
+            blocked_agent=agents[0] if agents else None,
+            uninstall=a.uninstall,
+            dry_run=a.dry_run,
+            say=say,
+        )
+    except installer.InstallError as e:
+        print(f"n-antibot: not installed: {e}", file=sys.stderr)
+        return 5
+    return 0
+
+
 def cmd_serve(a: argparse.Namespace) -> int:
     cfg = _config(a)
     token = os.environ.get("N_ANTIBOT_TOKEN") or None
@@ -224,6 +276,22 @@ def parser() -> argparse.ArgumentParser:
         "--min-repeat", type=int, default=3, metavar="N", help="ad clicks from one IP to call it repeated (3)"
     )
     p.set_defaults(func=cmd_report)
+
+    p = sub.add_parser(
+        "install", help="install on Caddy, nginx, Apache or nftables: backup, validate, reload, check, roll back"
+    )
+    p.add_argument(
+        "server", nargs="?", choices=["caddy", "nginx", "apache", "nftables"], help="found automatically if omitted"
+    )
+    p.add_argument("-c", "--config", help="n-antibot TOML configuration (defaults if omitted)")
+    p.add_argument("--site", help="the site to protect, as written in the server configuration (example.com)")
+    p.add_argument("--config-file", metavar="FILE", help="server configuration file that declares the site")
+    p.add_argument("--dest", metavar="FILE", help="where to put the generated file")
+    p.add_argument("--check-url", metavar="URL", help="check the live site afterwards, and roll back if it fails")
+    p.add_argument("--backup-dir", metavar="DIR", default="/var/backups/n-antibot", help="where backups go")
+    p.add_argument("--dry-run", action="store_true", help="show what would change and change nothing")
+    p.add_argument("--uninstall", action="store_true", help="remove it and reload")
+    p.set_defaults(func=cmd_install)
 
     p = sub.add_parser("serve", help="read-only JSON API with the report data")
     common(p, fmt=False)

@@ -9,6 +9,16 @@
 
 Your site is served by nginx, directly or as a reverse proxy (Node, PHP-FPM, Python, Ruby…).
 
+## The short way
+
+```bash
+sudo n-antibot install nginx --site example.com --check-url https://example.com
+```
+
+It generates the file, backs up, adds the line to your site's configuration, validates, reloads and checks live; if
+anything fails, it puts everything back. With `--dry-run` it only says what it would do; with `--uninstall` it
+removes it. Tested end to end with a real server. What follows is the same, step by step and by hand.
+
 ## Steps
 
 **1. Generate the file and copy it.**

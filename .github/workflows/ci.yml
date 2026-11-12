@@ -62,6 +62,12 @@ jobs:
           (sudo nft --version) 2>/dev/null || echo "nft: not installed"
       - run: pip install -e . pytest
       - run: pytest -q -rs
+      - name: One-line installer, from this checkout
+        if: runner.os != 'Windows'
+        run: |
+          N_ANTIBOT_HOME="$RUNNER_TEMP/n-antibot" N_ANTIBOT_BIN="$RUNNER_TEMP/bin" N_ANTIBOT_SOURCE="$PWD" sh install.sh
+          "$RUNNER_TEMP/bin/n-antibot" --version
+          "$RUNNER_TEMP/bin/n-antibot" install --help >/dev/null
       - name: Command line smoke test
         shell: bash
         run: |

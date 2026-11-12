@@ -83,7 +83,7 @@ def caddy(tmp_path):
             "{\n\tauto_https off\n\tadmin off\n}\n"
             f":{port} {{\n\timport {d}/n-antibot.caddy\n\tlog {{\n\t\toutput file {d}/access.log\n\t}}\n"
             '\thandle /api/* {\n\t\trespond "api" 200\n\t}\n'
-            '\thandle /producto/* {\n\t\trespond "producto" 200\n\t}\n'
+            '\thandle /product/* {\n\t\trespond "product" 200\n\t}\n'
             '\thandle {\n\t\trespond "ok" 200\n\t}\n}\n'
         )
         procs.append(
@@ -137,7 +137,7 @@ def test_agents(server, request):
     assert get(port, "/", GOOGLE) == 200
     assert get(port, "/", "curl/8.7.1") == 200
     assert get(port, "/", BYTESPIDER) == "closed"
-    assert get(port, "/producto/x/", BYTESPIDER) == "closed"
+    assert get(port, "/product/x/", BYTESPIDER) == "closed"
     assert get(port, "/media/a.jpg", "python-requests/2.32.3") == "closed"
     assert get(port, "/api/hook", "python-requests/2.32.3") == 200  # excluded path
     assert get(port, "/.well-known/acme-challenge/x", BYTESPIDER) in (200, 404)
@@ -147,7 +147,7 @@ def test_agents(server, request):
 def test_networks(server, request):
     port = request.getfixturevalue(server)(True)
     assert get(port, "/", CHROME) == "closed"
-    assert get(port, "/producto/x/", GOOGLE) == "closed"
+    assert get(port, "/product/x/", GOOGLE) == "closed"
     assert get(port, "/api/hook", CHROME) == 200
 
 
@@ -177,9 +177,9 @@ def apache(tmp_path):
     def start(block_loopback: bool, htaccess: bool = False) -> int:
         port = free_port()
         d = tmp_path / f"apache{port}"
-        for sub in ("www/api", "www/producto", "www/.well-known"):
+        for sub in ("www/api", "www/product", "www/.well-known"):
             (d / sub).mkdir(parents=True)
-        for page in ("www/index.html", "www/api/hook", "www/producto/index.html", "www/.well-known/x.txt"):
+        for page in ("www/index.html", "www/api/hook", "www/product/index.html", "www/.well-known/x.txt"):
             (d / page).write_text("ok")
         rules = generate(cfg("apache", block_loopback), fetch=no_fetch)
         (d / "n-antibot.conf").write_text(rules)
@@ -219,10 +219,10 @@ def apache(tmp_path):
 def test_apache_agents(apache, htaccess):
     port = apache(False, htaccess)
     assert get(port, "/", CHROME) == 200
-    assert get(port, "/producto/", GOOGLE) == 200
+    assert get(port, "/product/", GOOGLE) == 200
     assert get(port, "/", "curl/8.7.1") == 200
     assert get(port, "/", BYTESPIDER) == 403
-    assert get(port, "/producto/", BYTESPIDER) == 403
+    assert get(port, "/product/", BYTESPIDER) == 403
     assert get(port, "/missing.jpg", "python-requests/2.32.3") == 403
     assert get(port, "/api/hook", "python-requests/2.32.3") == 200
     assert get(port, "/.well-known/x.txt", BYTESPIDER) == 200
@@ -232,7 +232,7 @@ def test_apache_agents(apache, htaccess):
 def test_apache_networks(apache, htaccess):
     port = apache(True, htaccess)
     assert get(port, "/", CHROME) == 403
-    assert get(port, "/producto/", GOOGLE) == 403
+    assert get(port, "/product/", GOOGLE) == 403
     assert get(port, "/api/hook", CHROME) == 200
 
 
@@ -298,7 +298,7 @@ def test_report_reads_real_access_logs(server, request, tmp_path):
 
     port = request.getfixturevalue(server)(False)
     get(port, "/?gclid=BOT-1", BYTESPIDER)
-    get(port, "/producto/?gclid=BOT-2&utm_medium=cpc", "python-requests/2.32.3")
+    get(port, "/product/?gclid=BOT-2&utm_medium=cpc", "python-requests/2.32.3")
     get(port, "/?gclid=HUMAN-1", CHROME)
     get(port, "/?msclkid=MS-1", CHROME)
     get(port, "/", GOOGLE)

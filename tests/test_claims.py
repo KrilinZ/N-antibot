@@ -10,7 +10,7 @@ from n_antibot.cli import main
 
 TODAY = datetime(2026, 11, 20, tzinfo=timezone.utc)
 LOG = [
-    combined("43.173.1.1", "12/Nov/2026:10:00:01", "/a/?gclid=G-1&gad_campaignid=998877&utm_term=cola+de+caballo", 444),
+    combined("43.173.1.1", "12/Nov/2026:10:00:01", "/a/?gclid=G-1&gad_campaignid=998877&utm_term=running+shoes", 444),
     combined("43.173.1.1", "01/Sep/2026:10:00:01", "/a/?gclid=G-OLD", 444),  # older than Google's 60 days
     combined("8.8.8.8", "12/Nov/2026:10:01:00", "/?gclid=G-2", 200, "python-requests/2.32"),
     combined("81.40.1.1", "12/Nov/2026:10:02:00", "/?gclid=G-OK"),
@@ -18,13 +18,13 @@ LOG = [
     combined(
         "43.173.1.2",
         "12/Nov/2026:10:03:00",
-        "/?msclkid=M-1&utm_campaign=marca&adgroupid=55&adid=77&keyword=herbolario",
+        "/?msclkid=M-1&utm_campaign=brand&adgroupid=55&adid=77&keyword=shoes",
         444,
     ),
     combined(
         "43.173.1.3",
         "12/Nov/2026:10:04:00",
-        "/?utm_source=facebook&utm_medium=paid-social&utm_campaign=navidad&adset_id=5",
+        "/?utm_source=facebook&utm_medium=paid-social&utm_campaign=winter&adset_id=5",
         444,
     ),
     combined("43.173.1.4", "12/Nov/2026:10:05:00", "/?utm_source=newsletter&utm_medium=cpc", 444),
@@ -52,10 +52,10 @@ def test_platform_table_is_complete_and_sourced():
 
 
 def test_ad_fields_from_utm_and_platform_parameters():
-    f = report.ad_fields("/a/?gclid=G-1&gad_campaignid=998877&utm_term=cola+de+caballo")
-    assert f == {"campaign": "998877", "ad_group": "", "ad_id": "", "keyword": "cola de caballo"}
-    f = report.ad_fields("/?msclkid=M-1&utm_campaign=marca&adgroupid=55&adid=77&keyword=herbolario")
-    assert f == {"campaign": "marca", "ad_group": "55", "ad_id": "77", "keyword": "herbolario"}
+    f = report.ad_fields("/a/?gclid=G-1&gad_campaignid=998877&utm_term=running+shoes")
+    assert f == {"campaign": "998877", "ad_group": "", "ad_id": "", "keyword": "running shoes"}
+    f = report.ad_fields("/?msclkid=M-1&utm_campaign=brand&adgroupid=55&adid=77&keyword=shoes")
+    assert f == {"campaign": "brand", "ad_group": "55", "ad_id": "77", "keyword": "shoes"}
     assert report.ad_fields("/")["campaign"] == ""
 
 
@@ -80,7 +80,7 @@ def test_google_pack_has_what_google_asks_for(tmp_path):
     assert [r["within_deadline"] for r in rows] == ["no", "yes", "yes"]
     one = rows[1]
     assert one["ip"] == "43.173.1.1" and one["user_agent"] == CHROME and one["date_utc"] == "2026-11-12"
-    assert one["campaign"] == "998877" and one["keyword"] == "cola de caballo" and one["verdict"] == "bot"
+    assert one["campaign"] == "998877" and one["keyword"] == "running shoes" and one["verdict"] == "bot"
     text = (tmp_path / "google-claim.txt").read_text()
     assert "https://support.google.com/google-ads/contact/click_quality" in text
     assert "60 days from the activity." in text and "2 clicks inside the deadline, 1 already too old" in text
@@ -97,7 +97,7 @@ def test_google_pack_has_what_google_asks_for(tmp_path):
 def test_microsoft_and_meta_packs(tmp_path):
     packs(tmp_path)
     ms = next(csv.DictReader((tmp_path / "microsoft-clicks.csv").open()))
-    assert (ms["campaign"], ms["ad_group"], ms["ad_id"], ms["keyword"]) == ("marca", "55", "77", "herbolario")
+    assert (ms["campaign"], ms["ad_group"], ms["ad_id"], ms["keyword"]) == ("brand", "55", "77", "shoes")
     text = (tmp_path / "microsoft-claim.txt").read_text()
     assert "Affected ad group and ad group number" in text and "go.microsoft.com/fwlink?LinkId=398371" in text
     meta = (tmp_path / "meta-claim.txt").read_text()

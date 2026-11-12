@@ -16,6 +16,16 @@ It needs `mod_rewrite`, which is enabled on almost every host.
 > Apache cannot close a connection from its configuration, so the bot gets a **403 Forbidden** instead of the hard
 > cut of Caddy or nginx. It is a minimal answer, and your application (PHP, database) never runs.
 
+## The short way
+
+```bash
+sudo n-antibot install apache --site example.com --check-url https://example.com
+```
+
+It generates the file, backs up, adds the line to your site's configuration, validates, reloads and checks live; if
+anything fails, it puts everything back. With `--dry-run` it only says what it would do; with `--uninstall` it
+removes it. Tested end to end with a real server. What follows is the same, step by step and by hand.
+
 ## Option A: in the server configuration
 
 ```bash

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "N-antibot API",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "description": "Read-only data about bots and paid ad clicks, computed from your own access logs.",
     "license": {
       "name": "MIT",

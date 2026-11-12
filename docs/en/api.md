@@ -171,7 +171,7 @@ curl -H "Authorization: Bearer $N_ANTIBOT_TOKEN" "http://127.0.0.1:8787/v1/ad-cl
       "ad_group": null,
       "ad_id": null,
       "keyword": null,
-      "url": "/producto/a/?gclid=AAA111"
+      "url": "/product/a/?gclid=AAA111"
     }
   ]
 }
