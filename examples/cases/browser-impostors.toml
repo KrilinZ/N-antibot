@@ -1,0 +1,13 @@
+# Bots that pose as Chrome from residential proxies: one home address per request, so no network list helps.
+# Seen in November 2026: Chrome 123-154 on Windows over HTTP/1.1 to an HTTPS shop, without the Sec-Fetch-* and
+# Sec-Ch-Ua headers every real Chrome sends, often with a fixed Accept-Language. Search engines, AI crawlers and
+# assistants are never cut by these rules: check it with `n-antibot ai-check -c browser-impostors.toml`.
+# Use it when clients connect straight to your server (not behind a CDN that rewrites the HTTP version).
+
+[paths]
+exclude = ["/.well-known/*", "/api/*"]
+
+[stealth]
+presets = ["chrome-http1-without-fetch-metadata", "chrome-without-fetch-metadata", "residential-proxy-zh"]
+future_chrome = true
+referers = []

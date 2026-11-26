@@ -21,12 +21,13 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from urllib.parse import parse_qs, urlsplit
 
-from . import ranges
+from . import ranges, stealth
 from .config import Config
 from .presets import NETWORK_PRESETS
 
 COMBINED = re.compile(
-    r'^(?P<ip>\S+) \S+ \S+ \[(?P<ts>[^\]]+)\] "(?P<method>[A-Z]+) (?P<uri>\S+)[^"]*" (?P<status>\d{3}) \S+'
+    r'^(?P<ip>\S+) \S+ \S+ \[(?P<ts>[^\]]+)\] "(?P<method>[A-Z]+) (?P<uri>\S+)(?: (?P<proto>HTTP/[0-9.]+))?[^"]*" '
+    r"(?P<status>\d{3}) \S+"
     r'(?: "(?P<referer>[^"]*)" "(?P<ua>[^"]*)")?'
 )
 # Statuses that mean "this request was cut off": Caddy abort (0), nginx 444, Apache 403.
@@ -74,6 +75,10 @@ class Hit:
     uri: str
     status: int
     ua: str
+    # What fingerprint rules look at. None: the log does not say (nginx and Apache "combined" logs).
+    proto: str | None = None
+    https: bool | None = None
+    headers: tuple[tuple[str, str], ...] = ()
 
 
 def _caddy(obj: dict[str, Any]) -> Hit | None:
@@ -99,6 +104,12 @@ def _caddy(obj: dict[str, Any]) -> Hit | None:
         str(req["uri"]),
         int(obj.get("status", 0) or 0),
         str(ua[0] if isinstance(ua, list) and ua else ua or ""),
+        str(req["proto"]) if req.get("proto") else None,
+        bool(req.get("tls")) if "proto" in req else None,
+        tuple(
+            (str(k), ", ".join(map(str, v)) if isinstance(v, list) else str(v))
+            for k, v in (headers.items() if isinstance(headers, dict) else ())
+        ),
     )
 
 
@@ -120,7 +131,9 @@ def parse_line(line: str) -> Hit | None:
         when = datetime.strptime(m["ts"], "%d/%b/%Y:%H:%M:%S %z").astimezone(timezone.utc)
     except ValueError:
         when = None
-    return Hit(when, m["ip"], m["method"], m["uri"], int(m["status"]), m["ua"] or "")
+    referer = m["referer"] or ""
+    headers = (("Referer", referer),) if referer and referer != "-" else ()
+    return Hit(when, m["ip"], m["method"], m["uri"], int(m["status"]), m["ua"] or "", m["proto"], None, headers)
 
 
 def read_logs(paths: Iterable[str]) -> Iterator[str]:
@@ -199,15 +212,23 @@ class Classifier:
         labelled: Iterable[tuple[str, str]],
         allow: Iterable[str] = (),
         datacenters: Iterable[tuple[str, str]] = (),
+        rules: Iterable[stealth.Rule] = (),
     ):
         self.cfg = cfg
+        self._rules = tuple(rules)
+        self._declared = cfg.declared_regex()
         self._blocked = _Ranges(labelled)
         self._datacenters = _Ranges(datacenters)
         self._allow = [ipaddress.ip_network(a, strict=False) for a in allow]
         self._cache: dict[str, tuple[str | None, str | None]] = {}
 
     @classmethod
-    def from_config(cls, cfg: Config, fetch_asn: Callable[[str], list[str]] | None = None) -> Classifier:
+    def from_config(
+        cls,
+        cfg: Config,
+        fetch_asn: Callable[[str], list[str]] | None = None,
+        chrome: Callable[[], dict[str, int]] | None = None,
+    ) -> Classifier:
         fetch_asn = fetch_asn or ranges.fetch_asn_cached
         names = {asn: p.name for p in NETWORK_PRESETS.values() for asn in p.members}
 
@@ -219,7 +240,9 @@ class Classifier:
             return out
 
         blocked = labelled(cfg.all_asns()) + [("manual", c) for c in cfg.block_cidrs]
-        return cls(cfg, blocked, cfg.allow_cidrs, labelled(cfg.ads_asn_list()))
+        versions = (chrome or stealth.chrome_versions)() if cfg.needs_chrome_versions() else None
+        rules = cfg.stealth_rules(versions) if cfg.has_stealth() else ()
+        return cls(cfg, blocked, cfg.allow_cidrs, labelled(cfg.ads_asn_list()), rules)
 
     def _lookup(self, ip: str) -> tuple[str | None, str | None]:
         if ip in self._cache:
@@ -245,14 +268,40 @@ class Classifier:
         """The data-center range (not blocked) this address is in, with its ASN."""
         return self._lookup(ip)[1]
 
-    def verdict(self, ip: str, ua: str) -> tuple[str, str] | None:
-        """('network', 'AS132203 (tencent-cloud) 43.173.0.0/16') | ('agent', 'Bytespider') | None."""
+    def allowed(self, ip: str) -> bool:
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        if addr.version == 6 and addr.ipv4_mapped:
+            addr = addr.ipv4_mapped
+        return any(addr.version == a.version and addr in a for a in self._allow)
+
+    def fingerprint(self, hit: Hit) -> str | None:
+        """Name of the first fingerprint rule this request meets, or None. Unknown fields never match."""
+        if not self._rules or self.allowed(hit.ip):
+            return None
+        headers = dict(hit.headers)
+        for rule in self._rules:
+            if stealth.matches(
+                rule, user_agent=hit.ua, protocol=hit.proto, https=hit.https, headers=headers, declared=self._declared
+            ):
+                return rule.name
+        return None
+
+    def verdict(self, ip: str, ua: str, hit: Hit | None = None) -> tuple[str, str] | None:
+        """('network', 'AS132203 (tencent-cloud) 43.173.0.0/16') | ('agent', 'Bytespider') |
+        ('fingerprint', 'residential-proxy-zh') | None. Fingerprints need the whole request (`hit`)."""
         net = self.network(ip)
         if net:
             return "network", net
         agent = self.cfg.blocks_agent(ua)
         if agent:
             return "agent", agent
+        if hit is not None:
+            rule = self.fingerprint(hit)
+            if rule:
+                return "fingerprint", rule
         return None
 
 
@@ -330,14 +379,15 @@ def analyze(
             stats[1] += 1
         sample_ua.setdefault(hit.ip, hit.ua)
 
-        verdict = classifier.verdict(hit.ip, hit.ua)
+        verdict = classifier.verdict(hit.ip, hit.ua, hit)
         cut = hit.status in CUT_STATUSES
         if verdict:
             rep.bot_requests += 1
             rep.bot_cut += cut
             rep.bot_served += not cut
             rep.by_reason[verdict[0]] += 1
-            rep.by_detail[verdict[1].rsplit(" ", 1)[0] if verdict[0] == "network" else verdict[1]] += 1
+            detail = verdict[1].rsplit(" ", 1)[0] if verdict[0] == "network" else verdict[1]
+            rep.by_detail[f"fingerprint {detail}" if verdict[0] == "fingerprint" else detail] += 1
             bot_ips.add(hit.ip)
 
         ad = ad_click(hit.uri)
@@ -381,10 +431,11 @@ def analyze(
     return rep
 
 
-BOT_REASONS = ("network", "agent", "datacenter")
+BOT_REASONS = ("network", "agent", "fingerprint", "datacenter")
 REASONS = {
     "network": "from a blocked network",
     "agent": "blocked robot or scraper",
+    "fingerprint": "browser impostor (fingerprint rule)",
     "datacenter": "from a data-center network",
     "repeated": "same IP clicked several ads (hint)",
     "no-resources": "loaded no page resources (hint)",
@@ -417,12 +468,13 @@ def render_text(rep: Report) -> str:
         out.append("  None found (no gclid, msclkid... or utm_medium=cpc in the logged URLs).")
     for platform in rep.platforms():
         c = rep.clicks_by(platform)
-        bots = c.get("network", 0) + c.get("agent", 0) + c.get("datacenter", 0)
+        bots = c.get("network", 0) + c.get("agent", 0) + c.get("fingerprint", 0) + c.get("datacenter", 0)
         hints = c.get("repeated", 0) + c.get("no-resources", 0)
         out += [
             f"  {platform}: {c['total']} clicks",
             f"    bots:        {bots} ({_pct(bots, c['total'])})"
             f"  [blocked network {c.get('network', 0)}, robot {c.get('agent', 0)},"
+            f" fingerprint {c.get('fingerprint', 0)},"
             f" data center {c.get('datacenter', 0)}]",
             f"    suspicious:  {hints} ({_pct(hints, c['total'])})"
             f"  [repeated IP {c.get('repeated', 0)}, no resources {c.get('no-resources', 0)}]",

@@ -207,7 +207,7 @@ def test_ad_clicks_from_data_centers_are_bots_even_if_that_cloud_is_not_blocked(
     aws = next(x for x in rep.clicks if x.click_id == "AWS-1")
     assert report.click_verdict(aws) == "bot" and aws.detail == "AS16509 (aws) 3.0.0.0/9" and not aws.cut
     text = report.render_text(rep)
-    assert "bots:        1 (50.0%)  [blocked network 0, robot 0, data center 1]" in text
+    assert "bots:        1 (50.0%)  [blocked network 0, robot 0, fingerprint 0, data center 1]" in text
     assert report.click_dict(aws)["reason"] == "from a data-center network"
 
 

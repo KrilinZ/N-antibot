@@ -2,6 +2,27 @@
 
 All notable changes to N-antibot. Versions follow [semantic versioning](https://semver.org/).
 
+## 0.9.0 (2026-11-26)
+
+- **Bots that pose as a browser (`[stealth]`).** Fingerprint rules that cut a fake Chrome on residential proxies by
+  how it talks, not by where it comes from. Every condition of a rule must hold. Three opt-in presets:
+  `chrome-without-fetch-metadata` (Chrome 90+ over HTTPS without `Sec-Fetch-Mode` and `Sec-Ch-Ua`),
+  `chrome-http1-without-fetch-metadata` (Chrome over HTTP/1.x to an HTTPS site without `Sec-Fetch-Mode`) and
+  `residential-proxy-zh` (the fixed fingerprint of a scraper seen in November 2026).
+- **Your own fingerprints** with `[[stealth.fingerprint]]`: protocol, HTTPS, headers with an exact value, missing
+  headers, minimum Chrome version and Chrome versions behind today's stable.
+- **Impossible Chrome versions** (`future_chrome`): newer than today's Canary, read from Google's version history.
+- **Referer spam** (`referers`), also inside redirects such as `google.com/url?q=http://domain/`.
+- **Guards that cannot be turned off:** a User-Agent that declares a robot or a tool, a signed agent
+  (`Signature-Agent`), the published addresses of AI crawlers and search engines and `networks.allow` are never cut by
+  these rules. A rule that would cut a real browser request (Chrome over HTTP/2, HTTP/3, HTTP/1.1 behind a proxy,
+  plain HTTP, Edge, Android, Safari, Firefox) is refused when the configuration loads.
+- `n-antibot ai-check` also tries 29 search engines, AI crawlers and assistants against the fingerprint rules, in the
+  worst case. New `n-antibot test-request`.
+- Caddy, nginx, Apache, Cloudflare, JSON and the Node middleware. The report counts these requests as `fingerprint`
+  (Caddy JSON logs; referer and version rules also with combined logs).
+- The default output does not change.
+
 ## 0.8.0 (2026-11-13)
 
 - **AI crawlers and search engines are protected.** N-antibot downloads the address lists that OpenAI, Perplexity,
