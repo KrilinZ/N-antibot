@@ -157,7 +157,8 @@ def _n(count: int, word: str = "click") -> str:
 def _explanation(rows: list[report.AdClick], total: int, first: str, last: str) -> str:
     nets = Counter(c.detail.rsplit(" ", 1)[0] for c in rows if c.reason in ("network", "datacenter"))
     agents = Counter(c.detail for c in rows if c.reason == "agent")
-    bots = sum(nets.values()) + sum(agents.values())
+    impostors = Counter(c.detail for c in rows if c.reason == "fingerprint")
+    bots = sum(nets.values()) + sum(agents.values()) + sum(impostors.values())
     parts = [
         f"Between {first} and {last} (UTC) our web server logs recorded {total} paid ad clicks. "
         f"{bots} of them were made by automated clients, not by people."
@@ -171,6 +172,11 @@ def _explanation(rows: list[report.AdClick], total: int, first: str, last: str) 
     if agents:
         listed = ", ".join(f"{n} as {name}" for name, n in agents.most_common(5))
         parts.append(f"{_n(sum(agents.values()))} identified as robots or scraping libraries ({listed}).")
+    if impostors:
+        parts.append(
+            f"{_n(sum(impostors.values()))} claimed to be a browser but sent requests no real browser sends (missing "
+            "headers every real Chrome sends, an outdated HTTP version or a fixed header fingerprint)."
+        )
     hints = len(rows) - bots
     if hints:
         parts.append(

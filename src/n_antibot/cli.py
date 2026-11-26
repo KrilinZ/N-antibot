@@ -12,7 +12,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from . import __version__, ai, api, claims, installer, ranges, report
+from . import __version__, ai, api, claims, installer, ranges, report, stealth
 from .config import FORMATS, Config, ConfigError, load
 from .core import blocklist
 from .presets import NETWORK_PRESETS, ROBOT_PRESETS
@@ -74,6 +74,32 @@ def cmd_test_agent(a: argparse.Namespace) -> int:
     hit = cfg.blocks_agent(a.user_agent)
     print(f"BLOCKED by {hit!r}" if hit else "allowed")
     return 0 if hit else 2
+
+
+def cmd_test_request(a: argparse.Namespace) -> int:
+    """Would this whole request be cut by a fingerprint rule ([stealth])? Exit 0 cut, 2 allowed."""
+    cfg = _config(a)
+    if not cfg.has_stealth():
+        print("allowed: the configuration has no [stealth] rules")
+        return 2
+    headers: dict[str, str] = {}
+    for item in a.header or []:
+        name, sep, value = item.partition(":")
+        if not sep:
+            raise ValueError(f"--header {item!r} must look like 'Name: value'")
+        headers[name.strip()] = value.strip()
+    if a.referer:
+        headers["Referer"] = a.referer
+    versions = stealth.chrome_versions() if cfg.needs_chrome_versions() else None
+    declared = cfg.declared_regex()
+    for rule in cfg.stealth_rules(versions):
+        if stealth.matches(
+            rule, user_agent=a.user_agent, protocol=a.protocol, https=a.https, headers=headers, declared=declared
+        ):
+            print(f"BLOCKED by fingerprint rule {rule.name!r}")
+            return 0
+    print("allowed")
+    return 2
 
 
 def cmd_test_ip(a: argparse.Namespace) -> int:
@@ -183,14 +209,24 @@ def cmd_ai_check(a: argparse.Namespace) -> int:
     published, failed = ai.protected_ranges()
     blocked = [p for asn in cfg.all_asns() for p in ranges.fetch_asn_cached(asn)] + list(cfg.block_cidrs)
     rows = ai.check(cfg, blocked, published, failed)
-    cut = [r for r in rows if r["status"] == "cut"]
+    fp_rows: list[dict] = []
+    if cfg.has_stealth():
+        versions = stealth.chrome_versions() if cfg.needs_chrome_versions() else {"stable": 150, "canary": 151}
+        fp_rows = stealth.check_robots(cfg.stealth_rules(versions), cfg.declared_regex(), versions)
+    cut = [r for r in rows + fp_rows if r["status"] == "cut"]
     if a.json:
-        print(json.dumps(rows, indent=2))
+        print(json.dumps({"crawlers": rows, "fingerprint_rules": fp_rows} if fp_rows else rows, indent=2))
         return 1 if cut else 0
     print("AI crawlers and search engines with this configuration")
     for r in rows:
         mark = {"ok": "ok ", "cut": "CUT", "unknown": " ? "}[r["status"]]
         print(f"  {mark}  {r['crawler']:<22} {r['operator']:<12} {r['note']}")
+    if fp_rows:
+        print()
+        print("Search engines and AI crawlers against your fingerprint rules ([stealth]), in the worst case")
+        for r in fp_rows:
+            mark = {"ok": "ok ", "cut": "CUT"}[r["status"]]
+            print(f"  {mark}  {r['robot']:<30} {r['note']}")
     print()
     if cut:
         print(
@@ -237,6 +273,10 @@ def cmd_presets(_: argparse.Namespace) -> int:
             print(f"  {p.name:<24} {mark}  {p.description}")
             print(f"  {'':<24}          {', '.join(p.members)}")
         print()
+    print("Fingerprints ([stealth] presets), all opt-in")
+    for f in stealth.FINGERPRINT_PRESETS.values():
+        print(f"  {f.name:<36} {f.description}")
+    print()
     return 0
 
 
@@ -280,6 +320,17 @@ def parser() -> argparse.ArgumentParser:
     common(p, fmt=False)
     p.add_argument("user_agent")
     p.set_defaults(func=cmd_test_agent)
+
+    p = sub.add_parser(
+        "test-request", help="would this request be cut by a fingerprint rule? (exit 0 blocked, 2 allowed)"
+    )
+    common(p, fmt=False)
+    p.add_argument("user_agent")
+    p.add_argument("--protocol", default="HTTP/2", help="HTTP/1.0, HTTP/1.1, HTTP/2 or HTTP/3 (default HTTP/2)")
+    p.add_argument("--http", dest="https", action="store_false", help="plain HTTP (default: HTTPS)")
+    p.add_argument("-H", "--header", action="append", help="'Name: value', repeatable")
+    p.add_argument("--referer", help="Referer header")
+    p.set_defaults(func=cmd_test_request, https=True)
 
     p = sub.add_parser("test-ip", help="would this IP be blocked? (exit 0 blocked, 2 allowed)")
     common(p, fmt=False)

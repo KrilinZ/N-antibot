@@ -56,3 +56,24 @@ cut = false
 # Never cut the published addresses of AI crawlers and search engines (GPTBot, ChatGPT, Perplexity, Googlebot,
 # Bingbot, Applebot...), even inside a network you block. Set it to false only to block AI crawlers on purpose.
 protect = true
+
+[stealth]
+# Bots that pose as a real browser from residential proxies (no network list can stop them). All opt-in.
+# Ready-made rules (run `n-antibot presets`): "chrome-without-fetch-metadata", "chrome-http1-without-fetch-metadata",
+# "residential-proxy-zh". Declared robots (bot, crawl, Google, Bing, GPTBot...), signed agents and, with
+# [ai] protect, the published addresses of AI crawlers and search engines are never cut by these rules.
+presets = []
+# Cut a Chrome that claims a version newer than Google's Canary + future_margin (read from Google every day).
+future_chrome = false
+future_margin = 2
+# Referer-spam domains, e.g. ["spam.example"]. Also caught inside a redirect such as /url?q=http://spam.example/.
+referers = []
+
+# Your own rule: every condition you set must hold. Uncomment and adapt.
+# [[stealth.fingerprint]]
+# name = "my-scraper"
+# protocols = ["http/1.1"]                       # http/1.0, http/1.1, http/2, http/3
+# https = true                                   # only over HTTPS
+# headers = { "Accept-Language" = "xx-XX" }      # exact values
+# missing = ["Sec-Fetch-Mode"]                   # headers that must be absent
+# chrome_behind = 8                              # claimed Chrome more than 8 versions behind today's stable

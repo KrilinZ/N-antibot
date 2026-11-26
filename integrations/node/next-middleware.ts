@@ -14,6 +14,10 @@ export function middleware(request: NextRequest) {
     ip,
     userAgent: request.headers.get('user-agent'),
     path: request.nextUrl.pathname,
+    // Fingerprint rules ([stealth]) read the headers. The edge runtime does not tell the HTTP version, so rules
+    // that need a protocol never match here.
+    headers: request.headers,
+    https: request.nextUrl.protocol === 'https:',
   });
   if (verdict.blocked) return new Response(null, { status: 403 });
 }

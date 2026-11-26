@@ -5,6 +5,7 @@
 //   import { createMatcher, middleware } from './n-antibot.mjs';
 //   app.use(middleware(data));                       // Express / Connect / plain http
 //   createMatcher(data).check({ ip, userAgent, path }) // anywhere else -> { blocked, reason }
+//   Fingerprint rules ([stealth]) also need: headers (object, any case), protocol ('HTTP/1.1', 'HTTP/2'...), https.
 
 const V4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 
@@ -79,7 +80,8 @@ function pathMatcher(pattern) {
 
 /**
  * Build a matcher from the JSON made by `n-antibot generate -f json`.
- * check({ ip, userAgent, path }) -> { blocked: boolean, reason: 'network' | 'agent' | 'ad-click' | null, match }
+ * check({ ip, userAgent, path, headers, protocol, https })
+ *   -> { blocked: boolean, reason: 'network' | 'agent' | 'ad-click' | 'fingerprint' | null, match }
  * `path` may carry the query string: it is needed to recognise paid ad clicks.
  */
 export function createMatcher(data) {
@@ -96,6 +98,21 @@ export function createMatcher(data) {
   const adV4 = ads ? sorted(ads.ipv4 || []) : [];
   const adV6 = ads ? sorted(ads.ipv6 || []) : [];
   const adParams = ads ? ads.params || [] : [];
+  // Bots posing as a browser (only when generated with [stealth]).
+  const stealth = data.stealth && Array.isArray(data.stealth.rules) && data.stealth.rules.length ? data.stealth : null;
+  const declared = stealth && stealth.declared_regex ? new RegExp(stealth.declared_regex, 'i') : null;
+  const keepOpen = stealth ? [sorted((stealth.keep_open || []).filter((c) => !c.includes(':'))), sorted((stealth.keep_open || []).filter((c) => c.includes(':')))] : null;
+  const rules = stealth
+    ? stealth.rules.map((r) => ({
+        name: r.name,
+        ua: r.user_agent_regex ? new RegExp(r.user_agent_regex) : null,
+        protocols: r.protocols || [],
+        https: Boolean(r.https),
+        headers: Object.entries(r.headers || {}).map(([k, v]) => [k.toLowerCase(), v]),
+        missing: (r.missing || []).map((k) => k.toLowerCase()),
+        referer: r.referer_regex ? new RegExp(r.referer_regex, 'i') : null,
+      }))
+    : [];
 
   function findRange(ip, lists = [v4, v6]) {
     const list = ip.version === 4 ? lists[0] : lists[1];
@@ -110,7 +127,36 @@ export function createMatcher(data) {
     return null;
   }
 
-  function check({ ip, userAgent, path } = {}) {
+  function header(headers, name) {
+    if (!headers) return '';
+    const v = typeof headers.get === 'function' ? headers.get(name) : headers[name] ?? headers[Object.keys(headers).find((k) => k.toLowerCase() === name)];
+    return Array.isArray(v) ? v.join(', ') : v == null ? '' : String(v);
+  }
+
+  function canonProtocol(p) {
+    const t = String(p || '').toUpperCase();
+    const v = t.startsWith('HTTP/') ? t : `HTTP/${t}`;
+    return { 'HTTP/2.0': 'HTTP/2', 'HTTP/3.0': 'HTTP/3' }[v] || v;
+  }
+
+  function fingerprint({ ip, userAgent, headers, protocol, https }) {
+    const ua = String(userAgent || header(headers, 'user-agent') || '');
+    if (declared.test(ua) || header(headers, String(stealth.signed_header).toLowerCase())) return null;
+    const parsed = parseIp(ip);
+    if (parsed && findRange(parsed, keepOpen)) return null;
+    for (const r of rules) {
+      if (r.ua && !r.ua.test(ua)) continue;
+      if (r.protocols.length && (!protocol || !r.protocols.includes(canonProtocol(protocol)))) continue;
+      if (r.https && !https) continue;
+      if (r.headers.some(([k, v]) => header(headers, k) !== v)) continue;
+      if (r.missing.some((k) => header(headers, k) !== '')) continue;
+      if (r.referer && !r.referer.test(header(headers, 'referer'))) continue;
+      return r.name;
+    }
+    return null;
+  }
+
+  function check({ ip, userAgent, path, headers, protocol, https } = {}) {
     const pathname = String(path || '/').split('?')[0];
     if (excluded.some((m) => m(pathname))) return { blocked: false, reason: null, match: null };
     const ua = String(userAgent || '').toLowerCase();
@@ -125,6 +171,10 @@ export function createMatcher(data) {
         const cloud = findRange(parsed, [adV4, adV6]);
         if (cloud) return { blocked: true, reason: 'ad-click', match: cloud };
       }
+    }
+    if (stealth) {
+      const rule = fingerprint({ ip, userAgent, headers, protocol, https });
+      if (rule) return { blocked: true, reason: 'fingerprint', match: rule };
     }
     return { blocked: false, reason: null, match: null };
   }
@@ -143,7 +193,14 @@ export function middleware(data, options = {}) {
   const getIp = options.getIp || ((req) => req.socket?.remoteAddress);
   const action = options.action || 'destroy';
   return function nAntibot(req, res, next) {
-    const verdict = matcher.check({ ip: getIp(req), userAgent: req.headers['user-agent'], path: req.url });
+    const verdict = matcher.check({
+      ip: getIp(req),
+      userAgent: req.headers['user-agent'],
+      path: req.url,
+      headers: req.headers,
+      protocol: req.httpVersion,
+      https: options.https ?? Boolean(req.socket && req.socket.encrypted),
+    });
     if (!verdict.blocked) return next();
     if (action === 'forbidden') {
       res.statusCode = 403;

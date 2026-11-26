@@ -1,0 +1,97 @@
+{
+  "generator": "n-antibot 0.8.0",
+  "generated_on": "2026-11-26",
+  "asns": [],
+  "ipv4": [],
+  "ipv6": [],
+  "user_agents": [],
+  "user_agent_regex": null,
+  "exclude_paths": [
+    "/api/*",
+    "/.well-known/*"
+  ],
+  "stealth": {
+    "declared_regex": "(bot|spider|crawl|slurp|compatible;|google|bing|preview|lighthouse|pagespeed|facebook|meta-external|openai|gpt|claude|anthropic|perplexity|mistral|duckduck|duckassist|amazon|yandex|baidu|petal|cohere|yahoo|ia_archiver|archive\\.org)",
+    "signed_header": "Signature-Agent",
+    "keep_open": [
+      "66.249.64.0/27"
+    ],
+    "rules": [
+      {
+        "name": "chrome-http1-without-fetch-metadata",
+        "user_agent_regex": "^Mozilla/5\\.0 \\(.*Chrome/[0-9]",
+        "protocols": [
+          "HTTP/1.0",
+          "HTTP/1.1"
+        ],
+        "https": true,
+        "headers": {},
+        "missing": [
+          "Sec-Fetch-Mode"
+        ],
+        "referer_regex": null
+      },
+      {
+        "name": "chrome-without-fetch-metadata",
+        "user_agent_regex": "^Mozilla/5\\.0 \\(.*Chrome/(9[0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9])\\.",
+        "protocols": [],
+        "https": true,
+        "headers": {},
+        "missing": [
+          "Sec-Fetch-Mode",
+          "Sec-Ch-Ua"
+        ],
+        "referer_regex": null
+      },
+      {
+        "name": "residential-proxy-zh",
+        "user_agent_regex": "^Mozilla/5\\.0 \\(.*Chrome/[0-9]",
+        "protocols": [
+          "HTTP/1.0",
+          "HTTP/1.1"
+        ],
+        "https": true,
+        "headers": {
+          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
+        },
+        "missing": [
+          "Sec-Fetch-Mode"
+        ],
+        "referer_regex": null
+      },
+      {
+        "name": "future-chrome",
+        "user_agent_regex": "^Mozilla/5\\.0 \\(.*Chrome/(16[3-9]|1[7-9][0-9]|[2-9][0-9][0-9]|[1-9][0-9][0-9][0-9])\\.",
+        "protocols": [],
+        "https": false,
+        "headers": {},
+        "missing": [],
+        "referer_regex": null
+      },
+      {
+        "name": "referer-spam",
+        "user_agent_regex": null,
+        "protocols": [],
+        "https": false,
+        "headers": {},
+        "missing": [],
+        "referer_regex": "(^|[/.@=]|%2[Ff])(m\\.baidu\\.com|aocr\\.org)($|[/:?#&%])"
+      }
+    ]
+  },
+  "ad_clicks": {
+    "cut": false,
+    "params": [
+      "gclid",
+      "gbraid",
+      "wbraid",
+      "msclkid",
+      "ttclid",
+      "twclid",
+      "li_fat_id"
+    ],
+    "asns": [],
+    "ipv4": [],
+    "ipv6": []
+  }
+}

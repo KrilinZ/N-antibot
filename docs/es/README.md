@@ -33,6 +33,12 @@ curl -sI https://example.com | grep -i -E '^(server|via|cf-ray|x-vercel-id)'
 | `server: Vercel` o `x-vercel-id` | [Next.js y Vercel](vercel-nextjs.md) |
 | Otra cosa (LiteSpeed, IIS, un PaaS…) | [Node.js](node-express.md) si tu app es Node, o el [cortafuegos](nftables.md) si el servidor es tuyo |
 
+## Bots que se hacen pasar por un navegador
+
+[Bots que se hacen pasar por un navegador](navegadores-falsos.md): falsos Chrome desde proxies residenciales,
+reconocidos por sus cabeceras, su protocolo o su versión, sin tocar a buscadores ni IA. ✅ Probado con Caddy, nginx
+y Apache reales por HTTPS (HTTP/1.1 y HTTP/2).
+
 ## Informe de bots y de clics de anuncios
 
 [Informe de bots y de clics de anuncios](informe-anuncios.md): cuántas visitas son de bots y cuántos clics de pago

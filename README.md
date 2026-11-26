@@ -43,6 +43,15 @@ Sin cuentas · sin claves · sin JavaScript en tu web · código abierto (MIT)
 
 ---
 
+> [!NOTE]
+> **🆕 Novedad en la 0.9.0 (26-nov-2026): bots que se hacen pasar por Chrome.** Los que alquilan proxies
+> residenciales (una IP de casa distinta en cada petición) no caen en ninguna lista de redes. Ahora N-antibot los
+> reconoce por cómo hablan: un «Chrome» que va por HTTP/1.1 a una web HTTPS, que no manda las cabeceras `Sec-Fetch-*`
+> ni `Sec-Ch-Ua` que manda cualquier Chrome real, con una huella de cabeceras fija, con una versión que Google aún no
+> ha publicado o con spam de referer. Googlebot, Bingbot, GPTBot, ChatGPT y las demás IA nunca se cortan: por nombre,
+> por dirección oficial y con `n-antibot ai-check` para comprobarlo.
+> [Cómo se activa](#️-bots-que-se-hacen-pasar-por-un-navegador) · [Todos los cambios](CHANGELOG.md)
+
 ## ⚡ Instalar en 2 pasos
 
 En el servidor de tu web (Caddy, nginx o Apache):
@@ -93,7 +102,7 @@ n-antibot: installed: example.com is protected
 
 ### 🛡️ Corta los bots
 
-Redes de centros de datos y programas de raspado se quedan sin respuesta. Google, Bing, las IA y tus clientes entran igual.
+Redes de centros de datos, programas de raspado y falsos Chrome de proxies residenciales se quedan sin respuesta. Google, Bing, las IA y tus clientes entran igual.
 
 </td>
 <td width="33%" valign="top">
@@ -137,7 +146,7 @@ Caddy, nginx, Apache y `.htaccess`, el cortafuegos de Linux, Cloudflare, Node.js
 </table>
 
 <table align="center">
-<tr><td align="center"><b>7</b><br><sub>tecnologías</sub></td><td align="center"><b>6</b><br><sub>plataformas de anuncios documentadas</sub></td><td align="center"><b>90+</b><br><sub>pruebas, con servidores reales</sub></td><td align="center"><b>14</b><br><sub>combinaciones probadas en cada cambio</sub></td><td align="center"><b>0</b><br><sub>dependencias (Python 3.11+)</sub></td><td align="center"><b>2</b><br><sub>idiomas</sub></td></tr>
+<tr><td align="center"><b>7</b><br><sub>tecnologías</sub></td><td align="center"><b>6</b><br><sub>plataformas de anuncios documentadas</sub></td><td align="center"><b>170+</b><br><sub>pruebas, con servidores reales</sub></td><td align="center"><b>14</b><br><sub>combinaciones probadas en cada cambio</sub></td><td align="center"><b>0</b><br><sub>dependencias (Python 3.11+)</sub></td><td align="center"><b>2</b><br><sub>idiomas</sub></td></tr>
 </table>
 
 ## 📚 Índice
@@ -152,6 +161,7 @@ Caddy, nginx, Apache y `.htaccess`, el cortafuegos de Linux, Cloudflare, Node.js
 - [Qué hace](#-qué-hace)
 - [Por qué existe](#-por-qué-existe)
 - [Las IA siempre pueden leer tu web](#-las-ia-siempre-pueden-leer-tu-web)
+- [Bots que se hacen pasar por un navegador](#️-bots-que-se-hacen-pasar-por-un-navegador)
 - [N-antibot y PerimeterX](#-n-antibot-y-perimeterx)
 - [Qué bloquea y qué no](#️-qué-bloquea-y-qué-no)
 - [Cómo funciona](#️-cómo-funciona)
@@ -260,6 +270,80 @@ si bloqueas la nube desde la que rastrean, quedarían cortados. Con la configura
 ¿Quieres lo contrario, que las IA no lean tu web? Hay que decirlo dos veces, para que nunca sea por accidente:
 `protect = false` en `[ai]` y el preset `ai-training`. Ver [el caso](docs/es/casos.md#-sin-robots-de-ia).
 
+## 🕵️ Bots que se hacen pasar por un navegador
+
+Hay raspadores que alquilan **proxies residenciales**: cada petición sale de una conexión de casa distinta, en
+cualquier país, con un `User-Agent` de Chrome. Ninguna lista de redes los para. Lo que los delata es cómo hablan, y
+eso es lo que miran las reglas de `[stealth]` (todas opcionales, desactivadas por defecto).
+
+**Un caso real.** En un registro de accesos de 38 minutos de noviembre de 2026, un mismo raspador hizo 138 peticiones
+desde 136 IP distintas, cada una a una página distinta. Siempre «Chrome» en Windows (versiones 123 a 154, todas
+antiguas: la estable era la 159), siempre por HTTP/1.1, con `Accept-Language` fijo `zh-CN,zh;q=0.9,en;q=0.8`,
+`Accept-Encoding: gzip` a secas, `Connection: close` y **ninguna** de las cabeceras `Sec-Fetch-*` ni `Sec-Ch-Ua`.
+
+| Señal | Por qué delata | Regla |
+|---|---|---|
+| Chrome que no manda `Sec-Fetch-Mode` ni `Sec-Ch-Ua` a una web HTTPS | Todo Chrome, Edge, Opera o Brave las manda (Fetch Metadata desde Chrome 76, client hints desde Chrome 89) | `chrome-without-fetch-metadata` |
+| Chrome por HTTP/1.x a una web HTTPS, sin `Sec-Fetch-Mode` | Un Chrome real negocia HTTP/2 o HTTP/3 si el servidor lo ofrece, y siempre manda `Sec-Fetch-Mode` | `chrome-http1-without-fetch-metadata` |
+| La huella exacta del caso real | HTTP/1.x + ese `Accept-Language` + sin `Sec-Fetch-Mode` | `residential-proxy-zh` |
+| Una versión de Chrome que aún no existe | Más nueva que la Canary de hoy (se lee cada día de la API oficial de versiones de Google) | `future_chrome = true` |
+| Spam de referer | Dominios que tú pongas, también dentro de una redirección como `google.com/url?q=http://dominio/` | `referers = [...]` |
+| Tu propia huella | Protocolo, HTTPS, cabeceras con valor exacto, cabeceras que faltan, Chrome con N versiones de retraso | `[[stealth.fingerprint]]` |
+
+En aquel registro, la firma `chrome-http1-without-fetch-metadata` cazó las 138 peticiones del raspador y
+**ninguna** de robots buenos ni de visitantes reales.
+
+```toml
+[stealth]
+presets = ["chrome-http1-without-fetch-metadata", "chrome-without-fetch-metadata", "residential-proxy-zh"]
+future_chrome = true
+referers = ["spam.example"]
+
+# Una huella tuya: se corta solo si se cumplen TODAS las condiciones que pongas.
+[[stealth.fingerprint]]
+name = "chrome-viejo-http1"
+protocols = ["http/1.1"]
+https = true
+missing = ["Sec-Fetch-Mode"]
+chrome_behind = 8            # Chrome con más de 8 versiones de retraso sobre la estable de hoy
+```
+
+| Garantía | Cómo se cumple |
+|---|---|
+| **Los buscadores y las IA nunca se cortan** | Un `User-Agent` que se declara robot o herramienta (`bot`, `crawl`, `spider`, `compatible;`, `Google`, `Bing`, `GPTBot`, `ChatGPT`, `Claude`, `Perplexity`, `Lighthouse`, `Preview`…) no lo corta ninguna regla. Además, con `[ai] protect` las direcciones oficiales de las IA y los buscadores quedan fuera de estas reglas. |
+| **Los agentes firmados pasan** | Una petición con `Signature-Agent` (Web Bot Auth, como el agente de ChatGPT) no la corta ninguna regla. |
+| **Ninguna regla puede cortar a una persona** | Al cargar la configuración se prueba cada regla contra peticiones de navegadores reales: Chrome por HTTP/2 y HTTP/3, Chrome detrás de un proxy corporativo por HTTP/1.1 (también en chino), Chrome por HTTP sin cifrar, Edge, Android, Mac, Safari y Firefox. Si alguna se cortara, la configuración se rechaza y dice cuál. |
+| **Comprobable** | `n-antibot ai-check` prueba 29 robots buenos (Googlebot en sus variantes, Storebot, AdsBot, GoogleOther, Google-Read-Aloud, PageSpeed, Bingbot, MicrosoftPreview, GPTBot, OAI-SearchBot, ChatGPT-User, ClaudeBot, PerplexityBot, Applebot…) mandando justo lo que buscan tus reglas. `n-antibot test-request` prueba una petición tuya. |
+
+```console
+$ n-antibot ai-check -c n-antibot.toml
+...
+Search engines and AI crawlers against your fingerprint rules ([stealth]), in the worst case
+  ok   Googlebot                      passes by name, even sending everything the 4 rules look for
+  ok   GoogleOther                    passes by name, even sending everything the 4 rules look for
+  ok   bingbot                        passes by name, even sending everything the 4 rules look for
+  ok   GPTBot                         passes by name, even sending everything the 4 rules look for
+  ok   ChatGPT-User                   passes by name, even sending everything the 4 rules look for
+  ...
+None is cut off.
+
+$ n-antibot test-request -c n-antibot.toml --protocol HTTP/1.1 -H "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8" \
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
+BLOCKED by fingerprint rule 'chrome-http1-without-fetch-metadata'
+```
+
+> [!IMPORTANT]
+> Las reglas de protocolo y de HTTPS miran **la conexión que llega a tu servidor**. Si delante hay un CDN o un
+> balanceador que habla HTTP/1.1 con tu servidor, usa solo reglas sin `protocols` ni `https`, o ponlas en el propio
+> CDN. En HTTP sin cifrar no se puede distinguir a un Chrome real (no manda esas cabeceras), así que no se corta nada:
+> redirige a HTTPS.
+
+Dónde funciona: Caddy, nginx, Apache, Cloudflare (las versiones de Chrome usan `matches`, que pide plan Business o
+Enterprise; el resto usa `contains`) y el middleware de Node. No con nftables: el cortafuegos no ve las cabeceras.
+El informe (`n-antibot report`) cuenta estas peticiones como `fingerprint` con los registros JSON de Caddy, que traen
+las cabeceras; con los registros «combined» de nginx y Apache solo puede aplicar el spam de referer y las versiones.
+Guía completa: [docs/es/navegadores-falsos.md](docs/es/navegadores-falsos.md).
+
 ## 🥊 N-antibot y PerimeterX
 
 PerimeterX (hoy **HUMAN Bot Defender**) es la referencia comercial contra bots. N-antibot **no hace lo mismo**: resuelve
@@ -298,6 +382,8 @@ como PerimeterX; N-antibot no los ve, y lo dice en [sus límites](#-límites-lo-
 | GPTBot, ChatGPT, ClaudeBot, PerplexityBot y demás IA | ✅ pasa siempre, por nombre y por dirección oficial | solo con `[ai] protect = false` y el preset `ai-training` |
 | Googlebot, Bingbot, DuckDuckBot, Yandex, Applebot | ✅ pasa siempre | no se puede bloquear por error |
 | Chrome, Safari, Firefox, móviles | ✅ pasa siempre | no se puede bloquear por error |
+| Falsos Chrome desde proxies residenciales (sin `Sec-Fetch-*`, HTTP/1.1, huella fija, versión imposible) | ✅ pasa | `[stealth]` los corta ([cómo](#️-bots-que-se-hacen-pasar-por-un-navegador)) |
+| Spam de referer | ✅ pasa | `[stealth] referers` |
 | `curl`, `wget` | ✅ pasa siempre | son tus herramientas de comprobación |
 | Rutas excluidas (`/.well-known/*` y las que añadas) | ✅ pasa siempre | `[paths] exclude` |
 
@@ -509,7 +595,7 @@ O aislado, con [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.8.0`.
+Para fijar una versión concreta añade la etiqueta al final: `...N-antibot.git@v0.9.0`.
 
 ### 🟦 Instalación en Caddy
 
@@ -659,7 +745,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.8.0",
+  "generator": "n-antibot 0.9.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -731,6 +817,11 @@ cut = false                      # true: corta los clics de anuncios que vengan 
 | `ads.asns` | lista | `[]` | Otros ASN de servidores para lo mismo. |
 | `ai.protect` | sí/no | `true` | No cortar nunca las direcciones oficiales de las IA y los buscadores, ni dejar que una regla los corte por nombre. |
 | `ads.cut` | sí/no | `false` | Cortar en el servidor los clics de anuncios que vengan de esas redes. No vale con `nftables`. |
+| `stealth.presets` | lista | `[]` | Huellas de navegadores falsos incluidas. Ver [listas](#-listas-incluidas). |
+| `stealth.future_chrome` | sí/no | `false` | Cortar un Chrome que diga ser más nuevo que la Canary de hoy más `future_margin`. |
+| `stealth.future_margin` | número | `2` | Versiones de margen sobre la Canary. |
+| `stealth.referers` | lista | `[]` | Dominios de spam de referer (`spam.example`). |
+| `[[stealth.fingerprint]]` | tablas | | Tus huellas: `name`, `browser` (`chrome` o `any`), `protocols` (`http/1.0`, `http/1.1`, `http/2`, `http/3`), `https`, `headers` (valor exacto), `missing`, `chrome_min`, `chrome_behind`. Se cumplen todas o no se corta. |
 
 ### Validaciones que te protegen
 
@@ -745,6 +836,9 @@ La configuración se rechaza, con un mensaje que dice qué clave falla y por qu�
 | Un rango o un ASN que no lo son | `asns = ["132203"]` | `is not an ASN like 'AS132203'` |
 | Una ruta con forma no admitida | `exclude = ["/a/*/b"]` | `must be '/exact', '/prefix/*' or '*.ext'` |
 | Todas las listas vacías | | `nothing to block` |
+| Una huella que cortaría a un navegador real | `protocols = ["http/1.1"]` sola | `rule 'x' would cut a real visitor: Chrome behind a corporate proxy (HTTP/1.1)` |
+| Un referer que cortaría visitas de buscadores o redes | `referers = ["google.com"]` | `stealth.referers would cut visitors coming from https://www.google.com/` |
+| Huellas con nftables | | `[stealth] needs the request headers` |
 
 > [!WARNING]
 > Excluye siempre las rutas a las que llaman **otros servidores**: webhooks de pagos, APIs que consumen tus
@@ -789,6 +883,16 @@ ahí salen Googlebot, Bingbot y los relés de privacidad que usan personas reale
 | `seo-tools` | | AhrefsBot, SemrushBot, DataForSeoBot, serpstatbot, Barkrowler | Herramientas SEO comerciales. Bloquearlas solo oculta tu web en esas herramientas. |
 | `ai-training` | | GPTBot, ClaudeBot, anthropic-ai, CCBot, meta-externalagent, Amazonbot, cohere-ai | Robots de IA. Bloquearlos saca tu web de las respuestas de las IA. |
 
+### Huellas de navegadores falsos
+
+Todas opcionales (`[stealth] presets`).
+
+| Preset | Condiciones (todas a la vez) |
+|---|---|
+| `chrome-without-fetch-metadata` | Dice ser Chrome 90 o posterior, por HTTPS, sin `Sec-Fetch-Mode` y sin `Sec-Ch-Ua`. |
+| `chrome-http1-without-fetch-metadata` | Dice ser Chrome, por HTTP/1.0 o HTTP/1.1, por HTTPS, sin `Sec-Fetch-Mode`. |
+| `residential-proxy-zh` | Dice ser Chrome, por HTTP/1.x, por HTTPS, `Accept-Language` exacto `zh-CN,zh;q=0.9,en;q=0.8` y sin `Sec-Fetch-Mode`. |
+
 ## 🖥️ Comandos
 
 | Comando | Qué hace | Código de salida |
@@ -802,11 +906,13 @@ ahí salen Googlebot, Bingbot y los relés de privacidad que usan personas reale
 | `n-antibot serve [-c CFG] REGISTRO…` | API de solo lectura en JSON con esos datos. [Guía](docs/es/api.md). | `0` |
 | `n-antibot test-agent [-c CFG] "USER-AGENT"` | ¿Se cortaría este `User-Agent`? No usa la red. | `0` cortado · `2` pasa |
 | `n-antibot test-ip [-c CFG] IP` | ¿Se cortaría esta IP? | `0` cortada · `2` pasa |
+| `n-antibot test-request [-c CFG] "USER-AGENT" [--protocol P] [--http] [-H "Cabecera: valor"] [--referer URL]` | ¿Cortaría esta petición una huella de `[stealth]`? | `0` cortada · `2` pasa |
 | `n-antibot presets` | Lista las redes y robots incluidos. | `0` |
 | `n-antibot init [-o ARCHIVO]` | Crea una configuración de ejemplo (no sobrescribe). | `0` · `1` si ya existe |
 | `n-antibot --version` | Versión. | `0` |
 
-Códigos de error comunes a todos: `3` configuración no válida · `4` no se pudo leer RIPEstat (no se escribe nada).
+Códigos de error comunes a todos: `3` configuración no válida · `4` no se pudo leer RIPEstat o la API de versiones
+de Chrome (no se escribe nada).
 
 ```console
 $ n-antibot test-agent "Mozilla/5.0 (compatible; Bytespider; spider-feedback@bytedance.com)"
@@ -957,14 +1063,16 @@ ruff check src tests && ruff format --check src tests
 |---|---|
 | [`tests/test_unit.py`](tests/test_unit.py) | Agrupación y resta de rangos, validación de la respuesta de RIPEstat, reintentos, cada regla de la configuración, que ninguna lista incluida corte a un navegador o buscador, los tres formatos de salida y la línea de comandos. |
 | [`tests/test_servers.py`](tests/test_servers.py) | **De punta a punta:** arranca un Caddy, un nginx y un Apache reales con el archivo generado y lanza peticiones. Chrome, Googlebot y curl reciben `200`; Bytespider y python-requests quedan cortados, también en rutas con `handle` propio y desde un `.htaccess`; las rutas excluidas responden. En Linux carga además las reglas de nftables y comprueba que la red bloqueada deja de conectar. Cada prueba se omite si su servidor no está instalado. |
-| [`tests/node/n-antibot.test.mjs`](tests/node/n-antibot.test.mjs) | El middleware de Node con un servidor HTTP real: rangos IPv4 e IPv6, robots, rutas excluidas, corte de conexión y modo 403. |
+| [`tests/test_stealth.py`](tests/test_stealth.py) | Navegadores falsos: arranca Caddy, nginx y Apache reales **por HTTPS** y manda con curl, por HTTP/1.1 y HTTP/2, la petición exacta del raspador del caso real (cortada), la de un Chrome real en español y en chino (pasa), la de 29 buscadores y robots de IA con las cabeceras del raspador (pasan), la de un agente firmado (pasa), una versión imposible y spam de referer (cortadas). También las validaciones, el informe y la API de versiones de Chrome. |
+| [`tests/node/n-antibot.test.mjs`](tests/node/n-antibot.test.mjs) | El middleware de Node con un servidor HTTP real: rangos IPv4 e IPv6, robots, rutas excluidas, huellas de navegadores falsos, corte de conexión y modo 403. |
 
 ## 🚧 Límites: lo que N-antibot no hace
 
 Conviene saberlo antes de instalarlo:
 
-- **No detecta bots por comportamiento.** No hay huella de navegador, retos de JavaScript ni CAPTCHA. Un bot que
-  salga de una IP doméstica (proxies residenciales) con un `User-Agent` de Chrome pasa.
+- **No detecta bots por comportamiento.** No hay retos de JavaScript ni CAPTCHA. Desde la 0.9.0, `[stealth]` corta a
+  los falsos Chrome que se delatan en las cabeceras o en el protocolo; un bot con un navegador real completo (que
+  manda todas las cabeceras por HTTP/2) desde una IP doméstica sigue pasando.
 - **El `User-Agent` se puede falsear.** Un raspador que cambie su nombre no cae en la lista de robots, aunque sí en
   la de redes si sale de una red bloqueada.
 - **Bloquear una red entera tiene coste.** Si un cliente tuyo real navega desde un servidor de esa red (una VPN
@@ -1059,6 +1167,7 @@ N-antibot/
 │   ├── render.py       # salidas: Caddy, nginx, Apache, nftables, Cloudflare y JSON
 │   ├── report.py       # informe desde los registros: bots y clics de anuncios
 │   ├── ai.py           # rastreadores de IA y buscadores: sus direcciones oficiales nunca se cortan
+│   ├── stealth.py      # navegadores falsos: huellas, protocolo, versiones de Chrome y spam de referer
 │   ├── claims.py       # dónde reclama cada plataforma de anuncios y el expediente por plataforma
 │   ├── api.py          # API de solo lectura (n-antibot serve)
 │   ├── installer.py    # n-antibot install: copia, valida, recarga, comprueba y vuelve atrás

@@ -118,3 +118,63 @@ test('middleware: 403 mode and blocked network (loopback)', async () => {
     assert.equal(await request(port, '/', CHROME), 200);
   });
 });
+
+// Bots posing as a browser: tests/node/stealth.json is made by `n-antibot generate -f json` with every [stealth]
+// preset, future_chrome and two referer-spam domains (tests/test_stealth.py keeps it current).
+import { readFileSync } from 'node:fs';
+
+const stealthData = JSON.parse(readFileSync(new URL('./stealth.json', import.meta.url)));
+const IMPOSTOR = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36';
+const IMPOSTOR_HEADERS = { accept: 'text/html', 'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8', 'accept-encoding': 'gzip', connection: 'close' };
+const REAL = IMPOSTOR.replace('Chrome/144', 'Chrome/159');
+const REAL_HEADERS = {
+  'accept-language': 'es-ES,es;q=0.9',
+  'sec-ch-ua': '"Chromium";v="159", "Google Chrome";v="159"',
+  'sec-fetch-mode': 'navigate',
+  'sec-fetch-dest': 'document',
+};
+
+test('fingerprints: the impostor is cut, browsers, search engines and AI crawlers are not', () => {
+  const m = createMatcher(stealthData);
+  const run = (userAgent, headers, protocol = 'HTTP/1.1', ip = '203.0.113.7', https = true, path = '/brand/x') =>
+    m.check({ ip, userAgent, path, headers, protocol, https });
+  assert.deepEqual(run(IMPOSTOR, IMPOSTOR_HEADERS), {
+    blocked: true,
+    reason: 'fingerprint',
+    match: 'chrome-http1-without-fetch-metadata',
+  });
+  assert.equal(run(IMPOSTOR, IMPOSTOR_HEADERS, '2.0').match, 'chrome-without-fetch-metadata');
+  assert.equal(run(IMPOSTOR, IMPOSTOR_HEADERS, '1.1', '203.0.113.7', false).blocked, false); // plain HTTP
+  assert.equal(run(IMPOSTOR, IMPOSTOR_HEADERS, '1.1', '66.249.64.5').blocked, false); // published crawler address
+  assert.equal(run(IMPOSTOR, IMPOSTOR_HEADERS, '1.1', '203.0.113.7', true, '/api/x').blocked, false);
+  assert.equal(run(IMPOSTOR, { ...IMPOSTOR_HEADERS, 'signature-agent': '"https://chatgpt.com"' }).blocked, false);
+  for (const proto of ['1.1', '2.0', 'HTTP/3']) assert.equal(run(REAL, REAL_HEADERS, proto).blocked, false, proto);
+  assert.equal(run(REAL.replace('Chrome/159', 'Chrome/163'), REAL_HEADERS, '2.0').match, 'future-chrome');
+  const spam = { ...REAL_HEADERS, referer: 'https://www.google.com/url?q=http://m.baidu.com/' };
+  assert.equal(run(REAL, spam, '2.0').match, 'referer-spam');
+  for (const ua of [
+    'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/159.0.0.0 Safari/537.36',
+    'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GoogleOther) Chrome/159.0.0.0 Safari/537.36',
+    'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/159.0.0.0 Safari/537.36',
+    'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.1; +https://openai.com/gptbot',
+    'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot',
+    'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OAI-SearchBot/1.0; +https://openai.com/searchbot',
+  ]) {
+    assert.equal(run(ua, IMPOSTOR_HEADERS).blocked, false, ua);
+  }
+});
+
+test('fingerprints: the middleware reads protocol, TLS and headers from the request', async () => {
+  const get = (port, headers) =>
+    new Promise((resolve) => {
+      const req = http.get({ host: '127.0.0.1', port, path: '/', headers }, (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode));
+      });
+      req.on('error', () => resolve('closed'));
+    });
+  await serve({ data: stealthData, https: true }, async (port) => {
+    assert.equal(await get(port, { 'user-agent': IMPOSTOR, ...IMPOSTOR_HEADERS }), 'closed');
+    assert.equal(await get(port, { 'user-agent': REAL, ...REAL_HEADERS }), 200);
+  });
+});
