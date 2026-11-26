@@ -111,6 +111,8 @@ export function createMatcher(data) {
         headers: Object.entries(r.headers || {}).map(([k, v]) => [k.toLowerCase(), v]),
         missing: (r.missing || []).map((k) => k.toLowerCase()),
         referer: r.referer_regex ? new RegExp(r.referer_regex, 'i') : null,
+        matching: Object.entries(r.matching || {}).map(([k, v]) => [k.toLowerCase(), new RegExp(v)]),
+        odd: Object.entries(r.odd || {}).map(([k, v]) => [k.toLowerCase(), new RegExp(v)]),
       }))
     : [];
 
@@ -150,6 +152,8 @@ export function createMatcher(data) {
       if (r.https && !https) continue;
       if (r.headers.some(([k, v]) => header(headers, k) !== v)) continue;
       if (r.missing.some((k) => header(headers, k) !== '')) continue;
+      if (r.matching.some(([k, re]) => !re.test(header(headers, k)))) continue;
+      if (r.odd.some(([k, re]) => { const v = header(headers, k); return v === '' || re.test(v); })) continue;
       if (r.referer && !r.referer.test(header(headers, 'referer'))) continue;
       return r.name;
     }

@@ -150,6 +150,16 @@ test('fingerprints: the impostor is cut, browsers, search engines and AI crawler
   assert.equal(run(IMPOSTOR, { ...IMPOSTOR_HEADERS, 'signature-agent': '"https://chatgpt.com"' }).blocked, false);
   for (const proto of ['1.1', '2.0', 'HTTP/3']) assert.equal(run(REAL, REAL_HEADERS, proto).blocked, false, proto);
   assert.equal(run(REAL.replace('Chrome/159', 'Chrome/163'), REAL_HEADERS, '2.0').match, 'future-chrome');
+  // Chrome on Android with Firefox's Accept-Language and no client hints; a real Firefox with it passes.
+  const android = 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36';
+  const firefoxLang = { 'accept-language': 'en-US,en;q=0.5', 'sec-fetch-mode': 'navigate' };
+  assert.equal(run(android, firefoxLang, '2.0').match, 'chrome-language-not-from-chrome');
+  assert.equal(run(android, { ...firefoxLang, 'sec-ch-ua': '"Chromium";v="144"' }, '2.0').blocked, false);
+  assert.equal(run('Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0', firefoxLang, '2.0').blocked, false);
+  // A kit's fixed language ([stealth] languages) without Sec-Fetch-Mode.
+  assert.equal(run(REAL, { 'accept-language': 'zh-TW,zh;q=0.9', 'sec-ch-ua': '"Chromium";v="159"' }, '2.0').match, 'fixed-language');
+  // HeadlessChrome declares itself (a site's own Playwright checks).
+  assert.equal(run('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36', { 'accept-language': 'fr' }).blocked, false);
   const spam = { ...REAL_HEADERS, referer: 'https://www.google.com/url?q=http://m.baidu.com/' };
   assert.equal(run(REAL, spam, '2.0').match, 'referer-spam');
   for (const ua of [

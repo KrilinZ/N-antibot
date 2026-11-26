@@ -8,6 +8,7 @@
 exclude = ["/.well-known/*", "/api/*"]
 
 [stealth]
-presets = ["chrome-http1-without-fetch-metadata", "chrome-without-fetch-metadata", "residential-proxy-zh"]
+presets = ["chrome-http1-without-fetch-metadata", "chrome-without-fetch-metadata", "residential-proxy-zh",
+           "chrome-language-not-from-chrome"]
 future_chrome = true
 referers = []

@@ -59,6 +59,9 @@ sudo caddy reload --config /etc/caddy/Caddyfile
 | `chrome-without-fetch-metadata` | Chrome 90 or later, HTTPS, no `Sec-Fetch-Mode` and no `Sec-Ch-Ua`. |
 | `chrome-http1-without-fetch-metadata` | Chrome, HTTP/1.0 or HTTP/1.1, HTTPS, no `Sec-Fetch-Mode`. |
 | `residential-proxy-zh` | Chrome, HTTP/1.x, HTTPS, `Accept-Language` exactly `zh-CN,zh;q=0.9,en;q=0.8`, no `Sec-Fetch-Mode`. |
+| `chrome-language-not-from-chrome` | Chrome 90 or later, HTTPS, no `Sec-Ch-Ua` and an `Accept-Language` Chrome never writes (such as Firefox's `en-US,en;q=0.5`). |
+| `languages = ["zh-CN,zh;q=0.9,en;q=0.8"]` | Chrome, HTTPS, no `Sec-Fetch-Mode` and an `Accept-Language` equal to one of these values, over any protocol. `residential-proxy-zh` widened to the languages you choose. |
+| `block_languages = ["zh"]` | Any browser whose first language is one of these (`zh` covers `zh`, `zh-CN`, `zh-TW`...). **It also cuts people** who browse in that language: see [Languages](#languages). |
 | `future_chrome = true` | Chrome newer than today's Canary + `future_margin` (2 by default). The version is read from Google's official API (`versionhistory.googleapis.com`) when generating; if it does not answer, nothing is written. |
 | `referers = ["spam.example"]` | The `Referer` contains that domain, also inside `google.com/url?q=http://spam.example/` or encoded (`%2F%2Fspam.example`). |
 
@@ -75,12 +78,36 @@ And your own, with `[[stealth.fingerprint]]`:
 | `chrome_min` | The claimed Chrome version is at least this. |
 | `chrome_behind` | The claimed Chrome version is more than N versions behind today's stable. |
 
+## Languages
+
+`Accept-Language` gives a lot away, but a language alone is not enough: "zh-CN,zh;q=0.9,en;q=0.8" is exactly what a
+Chrome set to Chinese sends. So there are three levels, from safest to least safe:
+
+1. **`chrome-language-not-from-chrome`** (preset). Chrome always writes the language the same way: the first one
+   without `q`, then `q=0.9`, `0.8`... down to `0.1`. Firefox writes `en-US,en;q=0.5`. A "Chrome" that sends Firefox's
+   language and no `Sec-Ch-Ua` carries a header set borrowed from another tool. Seen on 2026-11-26: Chrome on Android
+   over HTTP/2, 872 requests from 260 addresses in one day. A real Chrome with an extension that changes the language
+   still sends `Sec-Ch-Ua` and passes; a missing language does not count as odd.
+2. **`languages`**: the fixed languages of a scraping kit, exact. They are only cut when `Sec-Fetch-Mode` is missing
+   too, which a real Chrome always sends over HTTPS, so a real Chinese visitor is not cut.
+3. **`block_languages`**: cuts by language, nothing else. It is a business decision, not a fingerprint: it stops
+   robots that arrive with a complete browser from a home address, but also every customer who browses in that
+   language. Search engines and AI crawlers still pass (by name, signature and official address). Use it only if you
+   really do not sell to people who speak that language.
+
+```toml
+[stealth]
+presets = ["chrome-language-not-from-chrome"]
+languages = ["zh-CN,zh;q=0.9,en;q=0.8"]
+# block_languages = ["zh"]   # only if you do not sell in Chinese: it also cuts people
+```
+
 ## What is never cut
 
 1. **Anyone who declares a robot or a tool.** If the `User-Agent` contains `bot`, `spider`, `crawl`, `slurp`,
    `compatible;`, `google`, `bing`, `preview`, `lighthouse`, `pagespeed`, `facebook`, `openai`, `gpt`, `claude`,
    `anthropic`, `perplexity`, `applebot`, `mistral`, `duckduck`, `amazon`, `yandex`, `baidu`, `petal`, `cohere`,
-   `yahoo`... (and the names of every protected AI crawler and of your `robots.allow`), no rule cuts it.
+   `yahoo`, `headlesschrome`... (and the names of every protected AI crawler and of your `robots.allow`), no rule cuts it.
 2. **Signed agents** with Web Bot Auth (`Signature-Agent`).
 3. **The official addresses** of AI crawlers and search engines (with `[ai] protect = true`, the default) and your
    `networks.allow` ranges.
@@ -135,6 +162,10 @@ headers: only referer spam and version rules apply there.
   HTTPS.
 - **Baidu's renderer** (Chrome with no "spider" in its name) falls under `chrome-http1-without-fetch-metadata`. If you
   want it in, add its ranges to `networks.allow`.
-- **Cloudflare**: rules with a Chrome version use `matches` (Business or Enterprise plan). Not tested on a real
+- **Your own site's checks** with Playwright or Puppeteer (`route.fetch`, `request`) send the `HeadlessChrome` agent
+  over HTTP/1.1 without Fetch Metadata. They say they are an automated browser, so they pass. If you run them from
+  your server, do **not** put its address in `networks.allow`: your live checks with curl would pass too and you would
+  not know whether the cut works.
+- **Cloudflare**: rules with a Chrome version or a language use `matches` (Business or Enterprise plan). Not tested on a real
   account.
 - A bot driving a full real browser (every header, HTTP/2) from a home IP still gets through.

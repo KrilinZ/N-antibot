@@ -75,6 +75,11 @@ def _caddy_stealth(bl: Blocklist, cfg: Config) -> tuple[list[str], list[str]]:
             lines.append(f'\theader {name} "{value}"')
         for name in r.missing:
             lines.append(f"\tnot header {name} *")
+        for k, (name, regex, _) in enumerate(r.matching, 1):
+            lines.append(f'\theader_regexp {m}Is{k} {name} "{regex}"')
+        for k, (name, regex, _) in enumerate(r.odd, 1):
+            lines.append(f"\theader {name} *")
+            lines.append(f'\tnot header_regexp {m}Odd{k} {name} "{regex}"')
         if r.referer_regex:
             lines.append(f'\theader_regexp {m}Ref Referer "(?i){r.referer_regex}"')
         for j in range(0, len(bl.keep_open), 8):
@@ -222,6 +227,15 @@ def _nginx_stealth(bl: Blocklist, cfg: Config) -> list[str]:
         for name in r.missing:
             fields.append(_nginx_var(name))
             pattern.append("")
+        for k, (name, regex, _) in enumerate(r.matching, 1):
+            lines += [f"map {_nginx_var(name)} ${p}_s{i}_is{k} {{", "\tdefault 0;", f'\t"~{regex}" 1;', "}"]
+            fields.append(f"${p}_s{i}_is{k}")
+            pattern.append("1")
+        for k, (name, regex, _) in enumerate(r.odd, 1):
+            # Present and not matching: absent ("") and matching give 0.
+            lines += [f"map {_nginx_var(name)} ${p}_s{i}_odd{k} {{", "\tdefault 1;", '\t"" 0;', f'\t"~{regex}" 0;', "}"]
+            fields.append(f"${p}_s{i}_odd{k}")
+            pattern.append("1")
         if r.referer_regex:
             lines += [f"map $http_referer ${p}_s{i}_ref {{", "\tdefault 0;", f'\t"~*{r.referer_regex}" 1;', "}"]
             fields.append(f"${p}_s{i}_ref")
@@ -311,6 +325,11 @@ def _apache_stealth(bl: Blocklist, cfg: Config) -> list[str]:
             lines.append(f'RewriteCond %{{HTTP:{name}}} "={value}"')
         for name in r.missing:
             lines.append(f'RewriteCond %{{HTTP:{name}}} "^$"')
+        for name, regex, _ in r.matching:
+            lines.append(f'RewriteCond %{{HTTP:{name}}} "{regex}"')
+        for name, regex, _ in r.odd:
+            lines.append(f'RewriteCond %{{HTTP:{name}}} "."')
+            lines.append(f'RewriteCond %{{HTTP:{name}}} "!{regex}"')
         if r.referer_regex:
             lines.append(f'RewriteCond %{{HTTP_REFERER}} "{r.referer_regex}" [NC]')
         for j in range(0, len(bl.keep_open), 8):
@@ -392,6 +411,11 @@ def _cf_stealth(bl: Blocklist) -> str:
             parts.append(f'any(http.request.headers["{name.lower()}"][*] eq "{value}")')
         for name in r.missing:
             parts.append(f'not any(lower(http.request.headers.names[*])[*] eq "{name.lower()}")')
+        for name, regex, _ in r.matching:
+            parts.append(f'any(http.request.headers["{name.lower()}"][*] matches "{_cf_str(regex)}")')
+        for name, regex, _ in r.odd:
+            parts.append(f'any(lower(http.request.headers.names[*])[*] eq "{name.lower()}")')
+            parts.append(f'not any(http.request.headers["{name.lower()}"][*] matches "{_cf_str(regex)}")')
         if r.referer_domains:
             parts.append("(" + " or ".join(f'lower(http.referer) contains "{d}"' for d in r.referer_domains) + ")")
         rules.append("(" + " and ".join(parts) + ")")
@@ -454,6 +478,8 @@ def as_json(bl: Blocklist, cfg: Config) -> str:
                             "headers": dict(r.headers),
                             "missing": list(r.missing),
                             "referer_regex": r.referer_regex or None,
+                            "matching": {n: regex for n, regex, _ in r.matching},
+                            "odd": {n: regex for n, regex, _ in r.odd},
                         }
                         for r in bl.stealth
                     ],
