@@ -1,5 +1,5 @@
 {
-  "generator": "n-antibot 0.8.0",
+  "generator": "n-antibot 0.10.0",
   "generated_on": "2026-11-26",
   "asns": [],
   "ipv4": [],
@@ -11,7 +11,7 @@
     "/.well-known/*"
   ],
   "stealth": {
-    "declared_regex": "(bot|spider|crawl|slurp|compatible;|google|bing|preview|lighthouse|pagespeed|facebook|meta-external|openai|gpt|claude|anthropic|perplexity|mistral|duckduck|duckassist|amazon|yandex|baidu|petal|cohere|yahoo|ia_archiver|archive\\.org)",
+    "declared_regex": "(bot|spider|crawl|slurp|compatible;|google|bing|preview|lighthouse|pagespeed|facebook|meta-external|openai|gpt|claude|anthropic|perplexity|mistral|duckduck|duckassist|amazon|yandex|baidu|petal|cohere|yahoo|ia_archiver|archive\\.org|headlesschrome)",
     "signed_header": "Signature-Agent",
     "keep_open": [
       "66.249.64.0/27"
@@ -29,7 +29,9 @@
         "missing": [
           "Sec-Fetch-Mode"
         ],
-        "referer_regex": null
+        "referer_regex": null,
+        "matching": {},
+        "odd": {}
       },
       {
         "name": "chrome-without-fetch-metadata",
@@ -41,7 +43,9 @@
           "Sec-Fetch-Mode",
           "Sec-Ch-Ua"
         ],
-        "referer_regex": null
+        "referer_regex": null,
+        "matching": {},
+        "odd": {}
       },
       {
         "name": "residential-proxy-zh",
@@ -57,7 +61,24 @@
         "missing": [
           "Sec-Fetch-Mode"
         ],
-        "referer_regex": null
+        "referer_regex": null,
+        "matching": {},
+        "odd": {}
+      },
+      {
+        "name": "chrome-language-not-from-chrome",
+        "user_agent_regex": "^Mozilla/5\\.0 \\(.*Chrome/(9[0-9]|[1-9][0-9][0-9]|[1-9][0-9][0-9][0-9])\\.",
+        "protocols": [],
+        "https": true,
+        "headers": {},
+        "missing": [
+          "Sec-Ch-Ua"
+        ],
+        "referer_regex": null,
+        "matching": {},
+        "odd": {
+          "Accept-Language": "^[A-Za-z]+(-[A-Za-z0-9]+)*(,[A-Za-z]+(-[A-Za-z0-9]+)*;q=0\\.9(,[A-Za-z]+(-[A-Za-z0-9]+)*;q=0\\.8(,[A-Za-z]+(-[A-Za-z0-9]+)*;q=0\\.7(,[A-Za-z]+(-[A-Za-z0-9]+)*;q=0\\.6(,[A-Za-z]+(-[A-Za-z0-9]+)*;q=0\\.5(,[A-Za-z]+(-[A-Za-z0-9]+)*;q=0\\.4(,[A-Za-z]+(-[A-Za-z0-9]+)*;q=0\\.3(,[A-Za-z]+(-[A-Za-z0-9]+)*;q=0\\.2(,[A-Za-z]+(-[A-Za-z0-9]+)*;q=0\\.1)*)?)?)?)?)?)?)?)?$"
+        }
       },
       {
         "name": "future-chrome",
@@ -66,7 +87,9 @@
         "https": false,
         "headers": {},
         "missing": [],
-        "referer_regex": null
+        "referer_regex": null,
+        "matching": {},
+        "odd": {}
       },
       {
         "name": "referer-spam",
@@ -75,7 +98,24 @@
         "https": false,
         "headers": {},
         "missing": [],
-        "referer_regex": "(^|[/.@=]|%2[Ff])(m\\.baidu\\.com|aocr\\.org)($|[/:?#&%])"
+        "referer_regex": "(^|[/.@=]|%2[Ff])(m\\.baidu\\.com|aocr\\.org)($|[/:?#&%])",
+        "matching": {},
+        "odd": {}
+      },
+      {
+        "name": "fixed-language",
+        "user_agent_regex": "^Mozilla/5\\.0 \\(.*Chrome/[0-9]",
+        "protocols": [],
+        "https": true,
+        "headers": {},
+        "missing": [
+          "Sec-Fetch-Mode"
+        ],
+        "referer_regex": null,
+        "matching": {
+          "Accept-Language": "^(zh-TW,zh;q=0\\.9)$"
+        },
+        "odd": {}
       }
     ]
   },

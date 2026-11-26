@@ -2,6 +2,21 @@
 
 All notable changes to N-antibot. Versions follow [semantic versioning](https://semver.org/).
 
+## 0.10.0 (2026-11-26)
+
+- **Language rules.** New preset `chrome-language-not-from-chrome`: Chrome 90+ over HTTPS without `Sec-Ch-Ua` and with
+  an `Accept-Language` Chrome never writes (Chrome writes the first language without `q`, then `q=0.9`, `0.8`...;
+  Firefox writes `en-US,en;q=0.5`). Seen in a real shop's log: Chrome on Android over HTTP/2, 872 requests from 260
+  addresses in one day.
+- **`[stealth] languages`**: exact Accept-Language values of a scraping kit, cut when `Sec-Fetch-Mode` is missing,
+  over any protocol (`residential-proxy-zh` widened to any language and to HTTP/2).
+- **`[stealth] block_languages`**: cut every browser whose first language is one of these codes. It cuts people too,
+  on purpose; robots that declare themselves, signed agents and the official addresses still pass.
+- Rules can now require a header to match a regular expression, or to be present and not match it, in Caddy, nginx,
+  Apache, Cloudflare (`matches`), JSON and the Node middleware.
+- `HeadlessChrome` counts as a declared tool: a site's own Playwright checks (`route.fetch`) send it over HTTP/1.1
+  without Fetch Metadata and were cut by `chrome-http1-without-fetch-metadata`.
+
 ## 0.9.0 (2026-11-26)
 
 - **Bots that pose as a browser (`[stealth]`).** Fingerprint rules that cut a fake Chrome on residential proxies by

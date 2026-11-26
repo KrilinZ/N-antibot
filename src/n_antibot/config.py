@@ -59,6 +59,8 @@ class Config:
     future_chrome: bool = False
     future_margin: int = 2
     referers: tuple[str, ...] = ()
+    languages: tuple[str, ...] = ()  # exact Accept-Language values of a scraper kit (with no Sec-Fetch-Mode)
+    block_languages: tuple[str, ...] = ()  # primary languages cut for everyone, people included (opt-in)
 
     # ---- derived lists -------------------------------------------------------------------------------------------
     def all_asns(self) -> tuple[str, ...]:
@@ -89,7 +91,9 @@ class Config:
         return tuple(FINGERPRINT_PRESETS[n] for n in self.stealth_presets) + self.fingerprints
 
     def has_stealth(self) -> bool:
-        return bool(self.fingerprint_list() or self.future_chrome or self.referers)
+        return bool(
+            self.fingerprint_list() or self.future_chrome or self.referers or self.languages or self.block_languages
+        )
 
     def needs_chrome_versions(self) -> bool:
         return self.future_chrome or any(f.chrome_behind for f in self.fingerprint_list())
@@ -105,6 +109,10 @@ class Config:
             rules.append(stealth.future_rule(versions, self.future_margin))
         if self.referers:
             rules.append(stealth.referer_rule(self.referers))
+        if self.languages:
+            rules.append(stealth.fixed_language_rule(self.languages))
+        if self.block_languages:
+            rules.append(stealth.blocked_language_rule(self.block_languages))
         return tuple(rules)
 
     def blocks_agent(self, user_agent: str) -> str | None:
@@ -230,6 +238,14 @@ class Config:
         for ref in stealth.REAL_REFERERS:
             if self.referers and re.search(stealth.referer_regex(self.referers), ref, re.I):
                 raise ConfigError(f"stealth.referers would cut visitors coming from {ref}")
+        for value in self.languages:
+            if not stealth.HEADER_VALUE_RE.match(value):
+                raise ConfigError(
+                    f"stealth.languages: {value!r} must be an Accept-Language value such as 'zh-CN,zh;q=0.9'"
+                )
+        for code in self.block_languages:
+            if not stealth.LANGUAGE_CODE_RE.match(code):
+                raise ConfigError(f"stealth.block_languages: {code!r} must be a lowercase language code such as 'zh'")
         if self.has_stealth() and self.format == "nftables":
             raise ConfigError("[stealth] needs the request headers: a firewall (nftables) cannot see them")
         if not self.has_stealth():
@@ -243,6 +259,10 @@ class Config:
             if self.referers:
                 headers["Referer"] = "https://www.google.com/"
             for rule in rules:
+                if rule.people and re.search(
+                    stealth.primary_language_regex(rule.people), headers.get("Accept-Language", "")
+                ):
+                    continue  # block_languages cuts these people on purpose
                 if stealth.matches(
                     rule, user_agent=ua, protocol=req.protocol, https=req.https, headers=headers, declared=declared
                 ):
@@ -319,6 +339,8 @@ _SCHEMA: dict[str, dict[str, str]] = {
         "future_chrome": "future_chrome",
         "future_margin": "future_margin",
         "referers": "referers",
+        "languages": "languages",
+        "block_languages": "block_languages",
     },
 }
 _STRINGS = {"format", "caddy_prefix", "caddy_block_path", "caddy_ip_matcher", "nginx_prefix", "nftables_table"}

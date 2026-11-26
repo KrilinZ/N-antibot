@@ -59,6 +59,9 @@ DECLARED: tuple[str, ...] = (
     "yahoo",
     "ia_archiver",
     "archive.org",
+    # Headless Chrome says so in its User-Agent. Test tools (Playwright's route.fetch and request API, Puppeteer)
+    # send it over HTTP/1.1 without Fetch Metadata: without this, a site's own checks would be cut.
+    "headlesschrome",
 )
 # Web Bot Auth (RFC 9421 HTTP message signatures): signed agents such as ChatGPT agent send this header.
 SIGNED_HEADER = "Signature-Agent"
@@ -103,10 +106,42 @@ class Fingerprint:
     missing: tuple[str, ...] = ()  # headers that must be absent
     chrome_min: int = 0  # the claimed Chrome major is at least this (0: any)
     chrome_behind: int = 0  # the claimed Chrome major is more than N versions behind today's stable (0: off)
+    # (name, regex, example): the header is present and matches the regex (case-sensitive, anchored by the regex).
+    matching: tuple[tuple[str, str, str], ...] = ()
+    # (name, regex, example): the header is present and does NOT match the regex. The example is a value that does not.
+    odd: tuple[tuple[str, str, str], ...] = ()
 
     def conditions(self) -> int:
         n = int(bool(self.protocols)) + len(self.headers) + len(self.missing) + int(self.https)
-        return n + int(bool(self.chrome_behind))
+        return n + int(bool(self.chrome_behind)) + len(self.matching) + len(self.odd)
+
+
+# ---- languages ------------------------------------------------------------------------------------------------------
+# The Accept-Language that Chrome writes: the first language without q, then q=0.9, 0.8 ... down to 0.1, and 0.1 for
+# every language after that (net::HttpUtil::GenerateAcceptLanguageHeader). Firefox writes "en-US,en;q=0.5", which no
+# Chrome sends.
+_LANG = r"[A-Za-z]+(-[A-Za-z0-9]+)*"  # no {m,n}: braces are placeholders in some servers
+
+
+def _chrome_language_regex() -> str:
+    inner = f"(,{_LANG};q=0\\.1)*"
+    for q in range(2, 10):
+        inner = f"(,{_LANG};q=0\\.{q}{inner})?"
+    return f"^{_LANG}{inner}$"
+
+
+CHROME_LANGUAGE = _chrome_language_regex()
+LANGUAGE_CODE_RE = re.compile(r"^[a-z]{2,3}$")
+
+
+def language_regex(values: tuple[str, ...]) -> str:
+    """Accept-Language equal to one of these values."""
+    return "^(" + "|".join(re.escape(v).replace("\\-", "-").replace("\\ ", " ") for v in values) + ")$"
+
+
+def primary_language_regex(codes: tuple[str, ...]) -> str:
+    """Accept-Language whose first language is one of these codes (zh matches zh, zh-CN, zh-TW...)."""
+    return "^(" + "|".join(codes) + ")([-;,]|$)"
 
 
 # Ready-made rules. All opt-in: list them under [stealth] presets.
@@ -138,6 +173,16 @@ FINGERPRINT_PRESETS: dict[str, Fingerprint] = {
             https=True,
             headers=(("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8"),),
             missing=("Sec-Fetch-Mode",),
+        ),
+        Fingerprint(
+            "chrome-language-not-from-chrome",
+            "Claims Chrome 90+ over HTTPS, sends no Sec-Ch-Ua and an Accept-Language that Chrome never writes (such "
+            "as Firefox's 'en-US,en;q=0.5'): a scraper with a borrowed header set. Seen in November 2026 as Chrome on "
+            "Android over HTTP/2, hundreds of addresses.",
+            https=True,
+            missing=("Sec-Ch-Ua",),
+            chrome_min=90,
+            odd=(("Accept-Language", CHROME_LANGUAGE, "en-US,en;q=0.5"),),
         ),
     ]
 }
@@ -470,6 +515,9 @@ class Rule:
     missing: tuple[str, ...] = ()
     referer_regex: str = ""  # case-insensitive; empty = any referer
     referer_domains: tuple[str, ...] = ()
+    matching: tuple[tuple[str, str, str], ...] = ()  # (header, regex, example): present and matching
+    odd: tuple[tuple[str, str, str], ...] = ()  # (header, regex, example): present and NOT matching
+    people: tuple[str, ...] = ()  # primary languages this rule cuts on purpose (blocked-language), people included
 
 
 MOZILLA = r"^Mozilla/5\.0 \("
@@ -491,7 +539,28 @@ def resolve(fp: Fingerprint, versions: Mapping[str, int] | None) -> Rule:
                 raise ranges.FetchError("Chrome version history was not read")
             hi = versions["stable"] - fp.chrome_behind - 1
         ua = chrome_ua(fp.chrome_min, hi)
-    return Rule(fp.name, ua, fp.protocols, fp.https, fp.headers, fp.missing)
+    return Rule(fp.name, ua, fp.protocols, fp.https, fp.headers, fp.missing, matching=fp.matching, odd=fp.odd)
+
+
+def fixed_language_rule(values: tuple[str, ...]) -> Rule:
+    """Chrome over HTTPS, without Sec-Fetch-Mode, with one of these exact Accept-Language values (any protocol)."""
+    return Rule(
+        "fixed-language",
+        chrome_ua(),
+        https=True,
+        missing=("Sec-Fetch-Mode",),
+        matching=(("Accept-Language", language_regex(values), values[0]),),
+    )
+
+
+def blocked_language_rule(codes: tuple[str, ...]) -> Rule:
+    """Any browser whose first language is one of these codes. It cuts people too: the site owner's decision."""
+    return Rule(
+        "blocked-language",
+        MOZILLA,
+        matching=(("Accept-Language", primary_language_regex(codes), f"{codes[0]},en;q=0.9"),),
+        people=codes,
+    )
 
 
 def future_rule(versions: Mapping[str, int], margin: int) -> Rule:
@@ -530,6 +599,14 @@ def matches(
     for name in rule.missing:
         if h.get(name.lower()):
             return False
+    for name, regex, _ in rule.matching:
+        value = h.get(name.lower())
+        if not value or not re.search(regex, value):
+            return False
+    for name, regex, _ in rule.odd:
+        value = h.get(name.lower())
+        if not value or re.search(regex, value):
+            return False
     return not (rule.referer_regex and not re.search(rule.referer_regex, h.get("referer", ""), re.I))
 
 
@@ -553,7 +630,7 @@ def worst_case(rule: Rule, user_agent: str, versions: Mapping[str, int]) -> Requ
         if not rule.ua_regex or re.search(rule.ua_regex, attempt):
             ua = attempt
             break
-    headers = list(rule.headers)
+    headers = list(rule.headers) + [(n, example) for n, _, example in (*rule.matching, *rule.odd)]
     if rule.referer_domains:
         headers.append(("Referer", f"http://{rule.referer_domains[0]}/"))
     return Request("", ua, rule.protocols[0] if rule.protocols else "HTTP/1.1", True, tuple(headers))

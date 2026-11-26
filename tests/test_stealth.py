@@ -51,11 +51,30 @@ REAL_HEADERS = {
     "Sec-Fetch-Dest": "document",
     "Upgrade-Insecure-Requests": "1",
 }
-ALL = ["chrome-http1-without-fetch-metadata", "chrome-without-fetch-metadata", "residential-proxy-zh"]
+ALL = [
+    "chrome-http1-without-fetch-metadata",
+    "chrome-without-fetch-metadata",
+    "residential-proxy-zh",
+    "chrome-language-not-from-chrome",
+]
+# Seen in November 2026: Chrome on Android over HTTP/2 with Fetch Metadata, but Firefox's Accept-Language and no
+# client hints. 872 requests from 260 addresses in one day.
+ANDROID_UA = (
+    "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile "
+    "Safari/537.36"
+)
+ANDROID_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Dest": "document",
+}
+FIXED = "zh-TW,zh;q=0.9"  # a kit's fixed Accept-Language, for [stealth] languages
 
 
 def stealth_cfg(fmt: str = "caddy", **extra):
-    body = {"presets": ALL, "future_chrome": True, "referers": ["m.baidu.com", "aocr.org"]}
+    body = {"presets": ALL, "future_chrome": True, "referers": ["m.baidu.com", "aocr.org"], "languages": [FIXED]}
     body.update(extra)
     return from_dict(
         {
@@ -95,6 +114,51 @@ def test_the_impostor_is_cut_and_real_browsers_are_not():
     for proto in ("HTTP/1.1", "HTTP/2", "HTTP/3"):
         assert would_cut(cfg, REAL_UA, REAL_HEADERS, proto) is None
         assert would_cut(cfg, REAL_UA, {**REAL_HEADERS, "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"}, proto) is None
+
+
+def test_languages():
+    cfg = stealth_cfg()
+    assert would_cut(cfg, ANDROID_UA, ANDROID_HEADERS, "HTTP/2") == "chrome-language-not-from-chrome"
+    assert would_cut(cfg, ANDROID_UA, {**ANDROID_HEADERS, "Accept-Language": "en-US,en;q=0.9"}, "HTTP/2") is None
+    assert would_cut(cfg, ANDROID_UA, {**ANDROID_HEADERS, "Sec-Ch-Ua": '"Chromium";v="144"'}, "HTTP/2") is None
+    no_lang = {k: v for k, v in ANDROID_HEADERS.items() if k != "Accept-Language"}
+    assert would_cut(cfg, ANDROID_UA, no_lang, "HTTP/2") is None  # absent is not "odd"
+    kit = {k: v for k, v in REAL_HEADERS.items() if not k.startswith("Sec-Fetch")} | {"Accept-Language": FIXED}
+    assert would_cut(cfg, REAL_UA, kit, "HTTP/2") == "fixed-language"
+    # Chrome writes these; none is odd.
+    for value in [
+        "es-ES,es;q=0.9",
+        "fr",
+        "zh-CN,zh;q=0.9,en;q=0.8",
+        "ca,es-ES;q=0.9,es;q=0.8,en;q=0.7,fr;q=0.6",
+        "en-US,en;q=0.9,de;q=0.8,fr;q=0.7,it;q=0.6,pt;q=0.5,nl;q=0.4,pl;q=0.3,sv;q=0.2,da;q=0.1,fi;q=0.1",
+    ]:
+        assert re.search(stealth.CHROME_LANGUAGE, value), value
+    for value in ["en-US,en;q=0.5", "en-US;q=0.9", "es-ES,es;q=0.8", "en-US, en;q=0.9", "*"]:
+        assert not re.search(stealth.CHROME_LANGUAGE, value), value
+
+
+def test_blocked_languages_cut_people_on_purpose_but_never_robots():
+    cfg = stealth_cfg(presets=[], future_chrome=False, referers=[], languages=[], block_languages=["zh"])
+    zh = {**REAL_HEADERS, "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"}
+    assert would_cut(cfg, REAL_UA, zh, "HTTP/2") == "blocked-language"
+    assert would_cut(cfg, REAL_UA, {**REAL_HEADERS, "Accept-Language": "zh"}, "HTTP/2") == "blocked-language"
+    assert would_cut(cfg, REAL_UA, REAL_HEADERS, "HTTP/2") is None
+    assert would_cut(cfg, REAL_UA, {**REAL_HEADERS, "Accept-Language": "en-US,en;q=0.9,zh;q=0.8"}, "HTTP/2") is None
+    for label, ua in stealth.GOOD_ROBOTS:
+        assert would_cut(cfg, ua.replace("CURRENT", "159"), zh, "HTTP/2") is None, label
+    for bad in (["ZH"], ["chinese"], ["z"]):
+        with pytest.raises(ConfigError, match="block_languages"):
+            stealth_cfg(block_languages=bad)
+
+
+def test_headless_chrome_declares_itself():
+    # Playwright's route.fetch sends this over HTTP/1.1 without Fetch Metadata (a site's own checks).
+    ua = (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 "
+        "Safari/537.36"
+    )
+    assert would_cut(stealth_cfg(), ua, {"Accept-Language": "fr"}) is None
 
 
 def test_future_chrome_and_referer_spam():
@@ -465,6 +529,15 @@ def test_server_cuts_the_impostor_and_lets_everyone_else_in(https_server, reques
     # curl itself, and excluded paths.
     assert curl(port, "curl/8.5.0", {}, http2=False) == 200
     assert curl(port, IMPOSTOR_UA, IMPOSTOR_HEADERS, http2=False, path="/api/hook") == 200
+    # Languages: Chrome with Firefox's Accept-Language and no client hints is cut; with client hints (a language
+    # extension) it passes, and so does a real Firefox. A kit's fixed language without Sec-Fetch-Mode is cut.
+    assert curl(port, ANDROID_UA, ANDROID_HEADERS, http2=h2) == cut
+    assert curl(port, REAL_UA, {**REAL_HEADERS, "Accept-Language": "en-US,en;q=0.5"}, http2=h2) == 200
+    firefox = "Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0"
+    assert curl(port, firefox, ANDROID_HEADERS, http2=h2) == 200
+    kit = {k: v for k, v in REAL_HEADERS.items() if not k.startswith("Sec-Fetch")} | {"Accept-Language": FIXED}
+    assert curl(port, REAL_UA, kit, http2=h2) == cut
+    assert curl(port, REAL_UA, {**REAL_HEADERS, "Accept-Language": FIXED}, http2=h2) == 200
     # Future Chrome version and referer spam, from an otherwise perfect browser.
     future = REAL_UA.replace("Chrome/159", "Chrome/163")
     assert curl(port, future, REAL_HEADERS, http2=h2) == cut

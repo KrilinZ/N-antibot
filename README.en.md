@@ -44,6 +44,13 @@ No accounts · no keys · no JavaScript on your site · open source (MIT)
 ---
 
 > [!NOTE]
+> **🆕 New in 0.10.0 (2026-11-26): language rules.** A "Chrome" that writes its language the way Firefox does
+> (`en-US,en;q=0.5`) and sends no `Sec-Ch-Ua` is cut by the `chrome-language-not-from-chrome` preset. With `languages`
+> you cut the fixed languages of a scraping kit (only when `Sec-Fetch-Mode` is missing too, so a real visitor in that
+> language gets in), and with `block_languages`, if you decide so, a whole language. `HeadlessChrome` (your own
+> Playwright checks) is no longer cut. It came from a real shop's traffic: 872 requests from 260 addresses in one day.
+> [Languages](docs/en/browser-impostors.md#languages) · [All changes](CHANGELOG.md)
+>
 > **🆕 New in 0.9.0 (2026-11-26): bots that pose as Chrome.** Bots that rent residential proxies (a different home
 > address for every request) match no network list. N-antibot now recognises them by how they talk: a "Chrome" that
 > uses HTTP/1.1 with an HTTPS site, that never sends the `Sec-Fetch-*` and `Sec-Ch-Ua` headers every real Chrome
@@ -285,6 +292,9 @@ always over HTTP/1.1, with the fixed `Accept-Language` `zh-CN,zh;q=0.9,en;q=0.8`
 | Chrome that sends neither `Sec-Fetch-Mode` nor `Sec-Ch-Ua` to an HTTPS site | Every Chrome, Edge, Opera or Brave sends both (Fetch Metadata since Chrome 76, client hints since Chrome 89) | `chrome-without-fetch-metadata` |
 | Chrome over HTTP/1.x to an HTTPS site, without `Sec-Fetch-Mode` | A real Chrome negotiates HTTP/2 or HTTP/3 when the server offers it, and always sends `Sec-Fetch-Mode` | `chrome-http1-without-fetch-metadata` |
 | The exact fingerprint of the real case | HTTP/1.x + that `Accept-Language` + no `Sec-Fetch-Mode` | `residential-proxy-zh` |
+| Chrome with its language written as Firefox does (`en-US,en;q=0.5`) and no `Sec-Ch-Ua` | Chrome always writes the language the same way (`q=0.9`, `0.8`...) and sends `Sec-Ch-Ua`: a header set borrowed from another tool | `chrome-language-not-from-chrome` |
+| A scraping kit's fixed language, without `Sec-Fetch-Mode` | The exact values you list, over any protocol; a real visitor in that language sends `Sec-Fetch-Mode` and gets in | `languages = [...]` |
+| A whole language (your decision) | It also cuts people who browse in that language; search engines and AI crawlers pass | `block_languages = [...]` |
 | A Chrome version that does not exist yet | Newer than today's Canary (read every day from Google's official version API) | `future_chrome = true` |
 | Referer spam | Domains you list, also inside a redirect such as `google.com/url?q=http://domain/` | `referers = [...]` |
 | Your own fingerprint | Protocol, HTTPS, headers with an exact value, missing headers, Chrome N versions behind | `[[stealth.fingerprint]]` |
@@ -592,7 +602,7 @@ Or isolated, with [pipx](https://pipx.pypa.io/):
 pipx install git+https://github.com/KrilinZ/N-antibot.git
 ```
 
-To pin a version, append the tag: `...N-antibot.git@v0.9.0`.
+To pin a version, append the tag: `...N-antibot.git@v0.10.0`.
 
 ### 🟦 Caddy setup
 
@@ -742,7 +752,7 @@ n-antibot generate -f json -o n-antibot.json
 
 ```json
 {
-  "generator": "n-antibot 0.9.0",
+  "generator": "n-antibot 0.10.0",
   "generated_on": "2026-11-12",
   "asns": ["AS132203", "AS45090"],
   "ipv4": ["1.12.0.0/14", "1.116.0.0/15", "…"],
@@ -889,6 +899,7 @@ All opt-in (`[stealth] presets`).
 | `chrome-without-fetch-metadata` | Claims Chrome 90 or later, over HTTPS, without `Sec-Fetch-Mode` and without `Sec-Ch-Ua`. |
 | `chrome-http1-without-fetch-metadata` | Claims Chrome, over HTTP/1.0 or HTTP/1.1, over HTTPS, without `Sec-Fetch-Mode`. |
 | `residential-proxy-zh` | Claims Chrome, over HTTP/1.x, over HTTPS, `Accept-Language` exactly `zh-CN,zh;q=0.9,en;q=0.8` and no `Sec-Fetch-Mode`. |
+| `chrome-language-not-from-chrome` | Claims Chrome 90 or later, over HTTPS, no `Sec-Ch-Ua` and an `Accept-Language` Chrome never writes. |
 
 ## 🖥️ Commands
 
